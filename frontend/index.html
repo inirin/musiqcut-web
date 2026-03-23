@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>MusiqCut</title>
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
+  <link rel="stylesheet" href="/css/style.css?v=1774242796">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── 헤더 ── -->
+  <header>
+    <div class="header-top">
+      <div class="logo" onclick="showPage('dashboard')" style="cursor:pointer">🎭 MusiqCut <span>AI 뮤직비디오 생성기</span></div>
+      <div class="theme-dropdown" id="theme-dropdown">
+        <button class="theme-current" id="theme-current" onclick="toggleThemeMenu()">🌗</button>
+        <div class="theme-menu hidden" id="theme-menu">
+          <button data-theme-val="auto">🌗 자동</button>
+          <button data-theme-val="light">☀️ 라이트</button>
+          <button data-theme-val="dark">🌙 다크</button>
+        </div>
+      </div>
+    </div>
+    <nav>
+      <a href="#" data-nav="dashboard">대시보드</a>
+      <a href="#" data-nav="guide">가이드</a>
+      <a href="#" data-nav="settings">설정</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ── 대시보드 ── -->
+    <div data-page="dashboard">
+      <div class="flex justify-between items-center page-header" style="margin-bottom:20px">
+        <h1 style="font-size:1.4rem">내 뮤지컬 작품들</h1>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ 새 작품 만들기</button>
+      </div>
+      <div id="api-status-bar" class="api-status-bar"></div>
+      <div id="gallery-grid" class="gallery-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">🎭</div>
+          <p>불러오는 중...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 작품 상세 (파이프라인 진행 + 결과 통합) ── -->
+    <div data-page="result" class="hidden">
+      <div class="flex justify-between items-center page-header" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:10px;flex:1">
+          <h1 id="result-title" style="font-size:1.4rem;margin:0">작품</h1>
+          <span id="result-status"></span>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" onclick="showPage('dashboard')">← 목록</button>
+        </div>
+      </div>
+
+      <!-- 완성 영상 -->
+      <div id="result-video-card" class="card hidden">
+        <div class="card-title">🎬 완성 영상</div>
+        <div style="display:flex;justify-content:center">
+          <video id="result-video" class="video-player" controls style="max-height:70vh;max-width:100%;border-radius:var(--radius)"></video>
+        </div>
+        <div class="flex gap-2" style="margin-top:12px">
+          <a id="result-download" class="btn btn-primary" download="musical.mp4">⬇ MP4 다운로드</a>
+        </div>
+        <!-- 작품 피드백 -->
+        <div class="project-feedback">
+          <div class="fb-buttons">
+            <button class="btn btn-secondary btn-sm feedback-btn" data-type="like" onclick="submitFeedback('like')">👍 좋아요</button>
+            <button class="btn btn-secondary btn-sm feedback-btn" data-type="dislike" onclick="submitFeedback('dislike')">👎 아쉬워요</button>
+          </div>
+          <div id="feedback-list"></div>
+          <form class="fb-comment-row" id="fb-comment-form">
+            <textarea id="feedback-comment" class="fb-comment-input auto-resize" placeholder="개선 의견을 남겨주세요..." enterkeyhint="send" rows="1"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">전송</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 작품 정보 -->
+      <div class="card">
+        <div class="card-title">작품 정보</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">테마</span><span id="result-theme" class="info-value"></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">아트 스타일</span><span id="result-art-style" class="info-value"></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">곡 길이 / 장면</span><span id="result-duration" class="info-value"></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">생성일</span><span id="result-date" class="info-value"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 파이프라인 (실시간 진행 + 과거 결과 통합) -->
+      <div class="card">
+        <div class="card-title">파이프라인</div>
+        <div class="steps">
+          <div class="step" id="step-1">
+            <div class="step-icon">✍️</div>
+            <div class="step-body">
+              <div class="step-name">STEP 1 — 스토리/컨셉 생성 (Gemini)</div>
+              <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
+              <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+              <pre id="step-1-lyrics" class="hidden mt-4 step-prompt"></pre>
+              <div class="step-feedback hidden" data-step="1">
+                <div class="step-fb-list"></div>
+                <form class="flex gap-2 step-fb-form" data-step="1">
+                  <textarea class="step-fb-input auto-resize" rows="1" placeholder="의견..." enterkeyhint="send"></textarea>
+                  <button type="submit" class="btn btn-sm">전송</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="step" id="step-2">
+            <div class="step-icon">🎵</div>
+            <div class="step-body">
+              <div class="step-name">STEP 2 — 음악 생성 (Suno AI)</div>
+              <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
+              <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+              <div id="step-2-prompt" class="hidden mt-4 step-prompt"></div>
+              <audio id="step-2-audio" class="hidden mt-4" controls style="width:100%"></audio>
+              <div class="step-feedback hidden" data-step="2">
+                <div class="step-fb-list"></div>
+                <form class="flex gap-2 step-fb-form" data-step="2">
+                  <textarea class="step-fb-input auto-resize" rows="1" placeholder="의견..." enterkeyhint="send"></textarea>
+                  <button type="submit" class="btn btn-sm">전송</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="step" id="step-3">
+            <div class="step-icon">🖼️</div>
+            <div class="step-body">
+              <div class="step-name">STEP 3 — 장면 구성 + 이미지 생성 (Gemini + Imagen)</div>
+              <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
+              <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+              <div id="image-previews" class="scene-previews mt-4"></div>
+              <div class="step-feedback hidden" data-step="3">
+                <div class="step-fb-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="step" id="step-4">
+            <div class="step-icon">🎞️</div>
+            <div class="step-body">
+              <div class="step-name">STEP 4 — 영상 클립 생성 (Wan 2.2 + 보컬 주체 싱크)</div>
+              <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
+              <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+              <div id="clip-previews" class="scene-previews mt-4"></div>
+              <div class="step-feedback hidden" data-step="4">
+                <div class="step-fb-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="step" id="step-5">
+            <div class="step-icon">🎬</div>
+            <div class="step-body">
+              <div class="step-name">STEP 5 — 최종 영상 합성</div>
+              <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
+              <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:16px 0 80px">
+        <button onclick="deleteProject()" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:var(--text-sm);opacity:0.6;transition:opacity 0.2s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.6'">작품 삭제하기</button>
+      </div>
+    </div>
+
+    <!-- ── 사용 가이드 ── -->
+    <div data-page="guide" class="hidden">
+      <h1 style="font-size:1.4rem;margin-bottom:20px">파이프라인 가이드</h1>
+
+
+      <div class="guide-intro">
+        <div class="card-title">작품 만들기</div>
+        <p class="guide-text">
+          테마/스토리만 입력하면 AI가 분위기, 아트 스타일, 캐릭터, 음악까지 모두 자동으로 결정합니다.
+        </p>
+        <div class="guide-table">
+          <div class="guide-row"><span class="guide-label">숏폼</span><span>15~30초 · 가사 2~4줄 · 바로 보컬 시작 · 다채로운 구성</span></div>
+        </div>
+      </div>
+
+      <div class="guide-flow">
+        <div class="card">
+          <div class="card-title">✍️ STEP 1 — 스토리/컨셉 생성</div>
+          <div class="guide-api">Gemini 2.5 Flash · Google Cloud API</div>
+          <div class="guide-io">
+            <div class="guide-io-in"><span>입력</span> 테마/스토리</div>
+            <div class="guide-io-out"><span>출력</span> 제목, 스토리/컨셉, 작곡 지시, 아트 스타일, 캐릭터 프로필</div>
+          </div>
+          <p class="guide-text">
+            테마에서 분위기/아트 스타일을 자동 판단하고, 캐릭터 외형 프로필(최대 3명)을 상세 정의합니다.
+            보컬 성별/연령대는 주인공 캐릭터에 맞춰 자동 결정됩니다.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🎵 STEP 2 — 음악 생성</div>
+          <div class="guide-api">Suno AI v3.5 · 외부 API</div>
+          <div class="guide-io">
+            <div class="guide-io-in"><span>입력</span> STEP 1의 스토리/컨셉 + 작곡 지시</div>
+            <div class="guide-io-out"><span>출력</span> MP3 음원 + Whisper 가사 추출 + 5초 단위 세그먼트 → 장면 수 자동 결정</div>
+          </div>
+          <p class="guide-text">
+            Suno v3.5가 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초 fade-out.
+            Demucs 보컬 분리 → Whisper large-v3가 실제 가사 + 단어별 타이밍 추출 → Gemini Flash가 오타 보정.
+            5초 고정 세그먼트로 장면 수 결정.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🖼️ STEP 3 — 장면 구성 + 이미지 생성</div>
+          <div class="guide-api">Gemini 2.5 Flash + Imagen 4 · Google Cloud API</div>
+          <div class="guide-io">
+            <div class="guide-io-in"><span>입력</span> STEP 1의 스토리 + STEP 2에서 결정된 장면 수</div>
+            <div class="guide-io-out"><span>출력</span> 장면별 설명/프롬프트 + PNG 이미지 (512×768 세로)</div>
+          </div>
+          <p class="guide-text">
+            Whisper 가사 싱크 타이밍 + 캐릭터 프로필을 기반으로 장면을 구성합니다.
+            STEP 1에서 결정된 아트 스타일이 모든 장면에 일관 적용되며, 캐릭터 외형이 매 장면의 이미지 프롬프트에 포함됩니다.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🎞️ STEP 4 — 영상 클립 생성</div>
+          <div class="guide-api">Wan 2.2 I2V + EchoMimicV3 Flash · ComfyUI · 로컬 GPU</div>
+          <div class="guide-io">
+            <div class="guide-io-in"><span>입력</span> STEP 3의 이미지 + 장면 설명 + 보컬 오디오</div>
+            <div class="guide-io-out"><span>출력</span> 장면별 MP4 영상 클립 (512×768 세로, ~5초)</div>
+          </div>
+          <p class="guide-text">
+            Whisper 보컬 타이밍 + 보컬 주체 여부(is_vocalist) + 샷 타입으로 엔진 자동 분기.
+            보컬 주체의 클로즈업/미디엄은 립싱크, 나머지는 모션 영상.
+          </p>
+          <div class="guide-detail">
+            <div class="guide-detail-title">엔진 분기</div>
+            보컬 주체 + 클로즈업/미디엄 → EchoMimicV3 Flash (보컬 싱크)<br>
+            와이드/비보컬/비주체 → Wan 2.2 I2V (환경 모션, 캐릭터 등장 억제)
+          </div>
+          <div class="guide-detail">
+            <div class="guide-detail-title">폴백 전략</div>
+            EchoMimic 실패 → Wan I2V 폴백 · Wan 실패 → 정지 이미지 영상
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🎬 STEP 5 — 최종 영상 합성</div>
+          <div class="guide-api">FFmpeg · 로컬</div>
+          <div class="guide-io">
+            <div class="guide-io-in"><span>입력</span> STEP 4의 영상 클립 + STEP 2의 음원</div>
+            <div class="guide-io-out"><span>출력</span> 최종 MP4 뮤직비디오</div>
+          </div>
+          <p class="guide-text">
+            클립 연결 (FPS 통일) → Suno 음악 오버레이 → faststart 최적화
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">참고 사항</div>
+        <ul class="guide-notes">
+          <li>한 번에 하나의 작업만 실행 가능합니다 (GPU/API 보호)</li>
+          <li>실패한 스텝부터 재시도할 수 있으며, 이전 스텝의 결과는 캐시됩니다</li>
+          <li>이전 스텝부터 재시도하면 이후 스텝은 자동으로 새로 생성됩니다</li>
+          <li>장면 수/곡 길이는 STEP 2 이후 자동 결정되며, DB에 별도 저장하지 않습니다</li>
+          <li>STEP 4 진행 중 리소스 모니터로 GPU 활용 상태를 확인할 수 있습니다</li>
+          <li>STEP 4에서 클로즈업/미디엄 장면은 EchoMimicV3 Flash로 자동 보컬 싱크 적용 (Demucs 보컬 분리 → 오디오 드리븐)</li>
+          <li>설정 페이지에서 API 키 연결 상태를 확인하세요</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔄 피드백 & 자동 개선</div>
+        <ul class="guide-notes">
+          <li>완성된 작품에 👍/👎 + 코멘트로 피드백 가능</li>
+          <li>각 스텝(스토리/음악)과 클립별로도 코멘트 가능</li>
+          <li>피드백이 3개 이상 쌓이면 Gemini가 분석 → 프롬프트 자동 개선</li>
+          <li>개선 이력 조회 + 롤백 가능 (설정 페이지)</li>
+          <li>자동 작품 생성 스케줄 (N시간 간격, 랜덤 테마)</li>
+          <li>자동 피드백 분석 스케줄 (별도 간격)</li>
+          <li>사이클: 자동 생성 → 리뷰 → 코멘트 → 분석 → 개선 → 반복</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── 설정 ── -->
+    <div data-page="settings" class="hidden">
+      <h1 style="font-size:1.4rem;margin-bottom:20px">설정</h1>
+
+      <!-- ── 일반 ── -->
+      <h2 style="font-size:1.1rem;margin:24px 0 12px;color:var(--text-muted)">일반</h2>
+
+      <!-- 알림 설정 -->
+      <div class="card">
+        <div class="setting-header">
+          <div>
+            <div class="card-title" style="margin:0">브라우저 알림</div>
+            <div class="setting-desc">작업 완료/실패 시 브라우저 알림을 받습니다</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notif-toggle" onchange="toggleNotification(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div>
+          <span id="notif-status" class="text-muted"></span>
+        </div>
+      </div>
+
+      <!-- ── API 키 ── -->
+      <h2 style="font-size:1.1rem;margin:32px 0 12px;color:var(--text-muted)">API 키</h2>
+
+      <!-- 1. Gemini -->
+      <div class="card">
+        <div class="setting-header">
+          <div>
+            <div class="card-title" style="margin:0">Google Gemini</div>
+            <div class="setting-desc">스크립트 + 이미지 + 가사 보정 (키2 등록 시 할당량 자동 로테이션)</div>
+          </div>
+          <span id="key-status-gemini" class="status-dot-label"></span>
+        </div>
+        <div class="setting-guide">
+          <ol>
+            <li><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">aistudio.google.com/app/apikey</a> 접속 후 Google 계정 로그인</li>
+            <li>"Create API key" 클릭 → Google Cloud 프로젝트 선택 또는 생성</li>
+            <li>생성된 <code>AIzaSy...</code> 형태의 키를 아래에 붙여넣기</li>
+          </ol>
+        </div>
+        <div class="form-group">
+          <label>API Key 1 (주키)</label>
+          <input type="password" id="key-input-gemini" placeholder="AIzaSy...">
+        </div>
+        <div class="form-group">
+          <label>API Key 2 (할당량 초과 시 자동 전환)</label>
+          <input type="password" id="key-input-gemini2" placeholder="AIzaSy... (선택)">
+        </div>
+        <div class="setting-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveGeminiKeys()">저장</button>
+          <button class="btn btn-secondary btn-sm" id="test-btn-gemini" onclick="testKey('gemini')">연결 테스트</button>
+        </div>
+      </div>
+
+      <!-- 2. Suno AI -->
+      <div class="card">
+        <div class="setting-header">
+          <div>
+            <div class="card-title" style="margin:0">Suno AI</div>
+            <div class="setting-desc">음악 생성</div>
+          </div>
+          <span id="key-status-suno" class="status-dot-label"></span>
+        </div>
+        <div class="setting-guide">
+          <ol>
+            <li><a href="https://sunoapi.org" target="_blank" class="link">sunoapi.org</a> 접속 후 회원가입/로그인</li>
+            <li>로그인 후 <a href="https://sunoapi.org/dashboard" target="_blank" class="link">Dashboard</a> → Settings → API Key Management에서 키 생성</li>
+            <li>생성된 API Key를 아래에 붙여넣기</li>
+          </ol>
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="key-input-suno" placeholder="suno-...">
+        </div>
+        <div class="setting-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveKey('suno')">저장</button>
+          <button class="btn btn-secondary btn-sm" id="test-btn-suno" onclick="testKey('suno')">연결 테스트</button>
+        </div>
+      </div>
+
+      <!-- ── 피드백 & 프롬프트 개선 ── -->
+      <h2 style="font-size:1.1rem;margin:32px 0 12px;color:var(--text-muted)">피드백 & 프롬프트 개선</h2>
+
+      <div class="card">
+        <div class="setting-header">
+          <div>
+            <div class="card-title" style="margin:0">피드백 분석 & 프롬프트 개선</div>
+            <div class="setting-desc">평가/코멘트를 분석하여 파이프라인 프롬프트를 자동 개선합니다</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="schedule-fb-toggle" onchange="toggleSchedule('feedback', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label>자동 분석 간격 (시간)</label>
+          <input type="number" id="schedule-fb-interval" value="12" min="1" max="48" step="1" style="width:80px">
+        </div>
+        <span id="schedule-fb-status" class="text-muted" style="font-size:var(--text-sm)"></span>
+        <div class="setting-actions">
+          <button class="btn btn-primary btn-sm" onclick="processFeedback()">수동 분석 실행</button>
+          <button class="btn btn-secondary btn-sm" onclick="rollbackPrompt()">되돌리기</button>
+          <button class="btn btn-secondary btn-sm" onclick="showImprovementHistory()">개선 이력</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="setting-header">
+          <div>
+            <div class="card-title" style="margin:0">자동 작품 생성</div>
+            <div class="setting-desc">설정 간격마다 랜덤 테마로 새 작품을 자동 생성합니다</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="schedule-gen-toggle" onchange="toggleSchedule('generation', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label>생성 간격 (시간)</label>
+          <input type="number" id="schedule-gen-interval" value="2" min="0.5" max="24" step="0.5" style="width:80px">
+        </div>
+        <span id="schedule-gen-status" class="text-muted" style="font-size:var(--text-sm)"></span>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- ── 새 프로젝트 생성 모달 ── -->
+<div id="create-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">새 뮤지컬 만들기</div>
+    <form id="create-form">
+      <div class="form-group">
+        <label>어떤 뮤지컬을 만들까요? *</label>
+        <textarea id="theme-input" rows="3" placeholder="예: 비 오는 도쿄 골목의 재즈 카페에서 마지막 밤을 보내는 피아니스트&#10;&#10;테마, 장소, 분위기, 캐릭터 등을 자유롭게 적어주세요" autofocus style="resize:vertical;min-height:4rem"></textarea>
+        <div class="text-muted" style="margin-top:4px">AI가 스토리, 분위기, 아트 스타일, 캐릭터를 자동으로 결정합니다</div>
+      </div>
+
+      <!-- 숏폼 전용 (15~30초) -->
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">취소</button>
+        <button type="submit" class="btn btn-primary">생성 시작</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 토스트 컨테이너 -->
+<div id="toast-container"></div>
+
+<!-- 라이트박스 -->
+<div id="lightbox" class="lightbox-overlay hidden" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <button class="lightbox-nav lightbox-prev" onclick="navigateLightbox(-1)">&#8249;</button>
+  <button class="lightbox-nav lightbox-next" onclick="navigateLightbox(1)">&#8250;</button>
+  <div class="lightbox-content">
+    <div class="lightbox-media-wrap">
+      <img id="lightbox-img" class="hidden" />
+      <video id="lightbox-video" class="hidden" controls></video>
+      <div id="lightbox-status-overlay" class="lightbox-status-overlay hidden"></div>
+    </div>
+    <div id="lightbox-caption" class="lightbox-caption"></div>
+    <div id="lightbox-info" class="lightbox-info hidden">
+      <div id="lightbox-lyrics" class="lightbox-lyrics"></div>
+      <div class="lightbox-audio-row">
+        <audio id="lightbox-audio" controls></audio>
+      </div>
+    </div>
+    <div class="lightbox-fb-wrap">
+      <div id="lightbox-fb-list" style="max-height:100px;overflow-y:auto"></div>
+      <form class="lightbox-fb-row" id="lightbox-fb-form">
+        <textarea id="lightbox-feedback-input" class="lightbox-fb-input auto-resize" placeholder="이 장면에 대한 의견..." enterkeyhint="send" rows="1"></textarea>
+        <button type="submit" class="lightbox-fb-btn">전송</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js?v=1774268702"></script>
+<script src="/js/dashboard.js?v=1774268702"></script>
+<script src="/js/pipeline.js?v=1774268702"></script>
+<script src="/js/feedback.js?v=1774268702"></script>
+<script src="/js/settings.js?v=1774242796"></script>
+
+</body>
+</html>

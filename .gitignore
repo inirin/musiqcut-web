@@ -1,0 +1,35 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+
+# AI 모델 체크포인트
+checkpoints/
+
+# 외부 벤더 (ComfyUI, LatentSync 등)
+vendor/
+
+# 생성된 프로젝트 데이터
+storage/projects/
+storage/temp/
+
+# DB
+*.db
+*.db-journal
+*.db-wal
+
+# 로그
+logs/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

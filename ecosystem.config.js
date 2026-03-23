@@ -1,0 +1,42 @@
+module.exports = {
+  apps: [
+    {
+      name: "musical-pipeline",
+      script: "venv/Scripts/uvicorn.exe",
+      args: "backend.main:app --host 0.0.0.0 --port 8000",
+      cwd: __dirname,
+      interpreter: "none",
+      watch: false,
+      autorestart: true,
+      max_restarts: 5,
+      restart_delay: 3000,
+      env: {
+        PYTHONPATH: __dirname,
+        PATH: process.env.PATH + ";C:\\Users\\inirin\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-full_build\\bin",
+      },
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      error_file: "logs/error.log",
+      out_file: "logs/out.log",
+      merge_logs: true,
+    },
+    {
+      name: "comfyui",
+      script: "venv/Scripts/python.exe",
+      args: "vendor/ComfyUI/main.py --listen 127.0.0.1 --port 8189 --dont-print-server",
+      cwd: __dirname,
+      interpreter: "none",
+      watch: false,
+      autorestart: true,
+      max_restarts: 3,
+      restart_delay: 5000,
+      env: {
+        PYTHONPATH: __dirname + "\\vendor\\ComfyUI",
+        PYTHONIOENCODING: "utf-8",
+      },
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      error_file: "logs/comfyui-error.log",
+      out_file: "logs/comfyui-out.log",
+      merge_logs: true,
+    },
+  ],
+};
