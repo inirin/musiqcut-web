@@ -403,8 +403,13 @@ async def _run_pipeline_steps(
                     total_duration=actual_duration)
 
                 # 보컬 감지 실패 → _VocalDetectionError로 상위 루프에서 재시도
+                # 보컬 세그먼트 0개이거나, 인식된 총 단어가 가사의 30% 미만이면 실패
                 vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
-                if vocal_count == 0:
+                total_words = sum(len(sg.get("words", [])) for sg in timed_lines)
+                expected_words = len(lyrics.replace("[End]", "").split())
+                if vocal_count == 0 or (expected_words > 0 and total_words < expected_words * 0.3):
+                    print(f"[STEP2] 보컬 감지 실패: {total_words}단어/{expected_words}예상",
+                          file=sys.stderr)
                     raise _VocalDetectionError()
 
             # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만)
