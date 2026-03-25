@@ -1,7 +1,44 @@
 // ── 대시보드 ──────────────────────────────────────
 pages['dashboard'] = loadDashboard;
 
+function _dashScheduleText(sched) {
+  const fmtFuture = ms => {
+    if (ms <= 0) return '곧 시작';
+    const m = Math.floor(ms / 60000);
+    if (m < 60) return `${m}분 후`;
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
+  };
+  if (sched.running_project) {
+    return `<span class="gen-dot running"></span>
+      <span class="gen-primary-text">생성 중 : ${sched.running_project.title}</span>`;
+  } else if (sched.last_created_at) {
+    const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
+    const remaining = nextMs - Date.now();
+    if (remaining <= 0) {
+      return `<span class="gen-dot pending"></span>
+        <span class="gen-primary-text">다음 생성 : 곧 시작</span>`;
+    }
+    return `<span class="gen-dot pending"></span>
+      <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)}</span>`;
+  }
+  return '';
+}
+
 async function loadDashboard() {
+  // 스케줄러 상태 (생성 중 / 다음 생성)
+  try {
+    const scheds = await API.get('/feedback/schedules');
+    const sched = scheds.generation;
+    const el = document.getElementById('dash-schedule-status');
+    if (el && sched?.enabled) {
+      el.innerHTML = `<div class="gen-primary" style="margin-bottom:8px">${_dashScheduleText(sched)}</div>`;
+    } else if (el) {
+      el.innerHTML = '';
+    }
+  } catch {}
+
   const projects = await API.get('/projects');
   const grid = document.getElementById('gallery-grid');
 
