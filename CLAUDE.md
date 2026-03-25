@@ -36,7 +36,7 @@ venv/Scripts/python.exe auto_generate.py
 **FastAPI backend** (port 8000) + **static frontend** + **ComfyUI** (port 8189) for GPU inference.
 
 ### Pipeline Flow (5 Steps, Sequential)
-1. **Script Generation** — Gemini 2.5 Flash → 제목, 가사, 음악 프롬프트, 아트 스타일, 캐릭터 (`claude_service.py`, 이름과 달리 Gemini 사용)
+1. **Script Generation** — Gemini 2.5 Flash → 제목, 가사, 음악 프롬프트, 아트 스타일, 캐릭터 (`gemini_script_service.py`)
 2. **Music Generation** — Suno AI → MP3 + Demucs 보컬 분리 → faster-whisper 전사 + whisperx forced alignment(wav2vec2) 단어별 정밀 타이밍 → Gemini Flash 가사 보정 (`suno_service.py`, `lyrics_sync_service.py`)
 3. **Image Generation** — Imagen 4 via Gemini API → 장면별 576x1024 PNG (`gemini_image_service.py`)
 4. **Video Clip Generation** — 장면별 자동 분기:

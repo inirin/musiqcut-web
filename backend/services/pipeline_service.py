@@ -12,7 +12,7 @@ from backend.utils.progress import ProgressEmitter
 from backend.utils.file_manager import (
     lyrics_path, music_path, image_path, clip_path, video_path
 )
-from backend.services.claude_service import generate_story, generate_scenes
+from backend.services.gemini_script_service import generate_story, generate_scenes
 from backend.services.gemini_image_service import generate_images
 from backend.services.suno_service import generate_music, measure_audio_duration
 from backend.services.wan_video_service import generate_video_clips as wan_generate_clips
