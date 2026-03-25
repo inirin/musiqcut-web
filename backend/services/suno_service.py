@@ -158,8 +158,16 @@ async def generate_music(
         "Content-Type": "application/json"
     }
 
-    # Suno music_style 500자 제한
-    style = music_prompt[:500] if len(music_prompt) > 500 else music_prompt
+    # Suno music_style 500자 제한 (마지막 완전한 문장/구절까지만)
+    style = music_prompt
+    if len(style) > 500:
+        style = style[:500]
+        # 마지막 쉼표/마침표 위치에서 자르기
+        for sep in ['. ', ', ', ' ']:
+            idx = style.rfind(sep)
+            if idx > 300:
+                style = style[:idx]
+                break
     vocal_keywords = ["vocal", "singing", "singer"]
     if not any(kw in style.lower() for kw in vocal_keywords):
         style = f"clear singing vocals, {style}"

@@ -97,7 +97,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 {{
   "title": "작품 제목 (한국어)",
   "lyrics": "전체 가사 (줄바꿈 포함, 한국어, 반드시 {lyrics_lines_desc})",
-  "music_prompt": "Suno AI용 영문 음악 스타일 프롬프트. 반드시 보컬 포함 (instrumental 금지). 보컬 성별/연령대/음색을 명시 (예: 'young female vocal with soft breathy tone'). 악기 나열보다 보컬 스타일/감정을 우선 기술. 장르는 자유롭게 (pop, rock, jazz, folk, R&B, hip-hop, musical theatre, opera, choral 등 테마에 맞게 선택). {suno_hint}",
+  "music_prompt": "Suno AI용 영문 음악 스타일 프롬프트 (최대 200자 이내!). 보컬 포함 필수. 보컬 성별/음색 + 장르 + 감정을 간결하게. {suno_hint}",
   "vocal_style": "보컬 스타일 (한국어, 예: '20대 여성, 맑고 감성적인 목소리' — 반드시 주인공 캐릭터의 성별/나이와 일치)",
   "art_style": "선택한 애니메이션 아트 스타일 (영문, 구체적으로 — photorealistic/photograph 금지)",
   "characters": [
