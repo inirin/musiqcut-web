@@ -34,6 +34,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 - 분위기: {mood}
 - 곡 분량: {duration_desc} ({lyrics_lines_desc} 가사)
 (분위기가 'auto'이면 테마에서 자연스럽게 도출되는 분위기를 자유롭게 선택하세요)
+(분위기에 [트렌드 힌트: ...]가 포함되어 있다면, 그 실존 인물/브랜드/작품을 Google 검색으로 파악하여 캐릭터 외형·보컬 스타일·아트 스타일에 적극 반영하세요. 단, 제목과 가사에는 고유명사를 쓰지 마세요)
 
 작사 가이드:
 - 가사는 반드시 {lyrics_lines_desc}로 작성 (이 줄 수가 곡 길이를 결정합니다!)
@@ -51,6 +52,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 
 아트 스타일:
 - 테마, 장르, 분위기에 가장 어울리는 **애니메이션 아트 스타일**을 자유롭게 선택하세요
+- **[트렌드 힌트]가 있으면**: 해당 작품/브랜드의 실제 비주얼 스타일을 검색하여 아트 스타일에 반영 (예: 라라랜드 → 따뜻한 네온 톤의 뮤지컬 애니메이션, 와우 → 판타지 게임 아트풍)
 - 3D 애니메이션: Pixar/Disney 스타일, DreamWorks 스타일, 카툰 렌더링(toon shading), 로우폴리, 클레이/점토 질감 3D, 미니어처 디오라마, Arcane 스타일, 스파이더버스 셀셰이딩 3D 등
 - 2D 애니메이션: 셀 애니메이션, 스튜디오 지브리, 신카이 마코토, 플라이셔, 카르툰 살룬, 컷아웃, 실루엣, 로토스코핑 등
 - 화풍별: 수채화, 유화, 라인 아트, 파스텔, 잉크워시, 우키요에, 아르누보, 아르데코, 팝아트, 픽셀아트, 점묘법 등
@@ -67,6 +69,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 
 캐릭터 설계:
 - 이 작품에 등장하는 **주인공과 주요 캐릭터**(최대 3명)의 외형을 상세히 정의하세요
+- **[트렌드 힌트]가 있으면**: 해당 실존 인물/작품의 실제 외형·스타일을 검색하여 캐릭터 외형에 반영 (보는 사람이 "아 그 사람이다!"라고 바로 느끼도록). 이름은 바꾸되 외형은 충실히 반영
 - 모든 장면에서 동일한 캐릭터가 일관되게 등장해야 하므로, 구체적인 외형 묘사가 핵심입니다
 - 각 캐릭터: 이름/별칭, 성별, 나이대, 머리 스타일/색, 눈 색, 피부톤, 체형, 의상, 특징적 액세서리
 - **헤어스타일은 AI 이미지 일관성의 핵심** — 머리카락이 있는 캐릭터는 반드시 구체적으로:
@@ -81,6 +84,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 
 보컬 스타일:
 - 주인공 캐릭터의 성별, 나이대, 성격에 어울리는 보컬을 구체적으로 정의하세요
+- **[트렌드 힌트]가 있으면**: 해당 인물의 실제 목소리/가창 스타일을 검색하여 보컬에 반영
 - vocal_style 필드에 한국어로 간결하게 명시 (예: "20대 여성, 맑고 감성적인 목소리", "40대 남성, 깊고 허스키한 바리톤")
 - music_prompt에도 영문으로 보컬 특성을 포함 — 반드시 vocal_style과 일관되게
 
@@ -190,10 +194,26 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         structure_desc=guide["structure"],
         suno_hint=guide["suno_hint"],
     )
-    response = await gemini_generate(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
+    # 트렌드 힌트가 있으면 Google Search grounding으로 실존 인물/작품 검색
+    if "[트렌드 힌트:" in mood:
+        from backend.utils.gemini_client import get_api_keys
+        from google import genai
+        from google.genai import types
+        keys = get_api_keys()
+        client = genai.Client(api_key=keys[0])
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            )
+        )
+    else:
+        response = await gemini_generate(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
     data = _parse_json(response.text)
     return {
         "title": data["title"],

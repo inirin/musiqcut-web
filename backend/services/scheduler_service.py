@@ -169,10 +169,12 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
         data = _json.loads(text)
         theme = data.get("theme", "").strip()
         mood = data.get("mood", "auto").strip()
-        inspired = data.get("inspired_by", "")
+        inspired = data.get("inspired_by", "").strip()
         if theme:
-            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}"
-                  f" (트렌드: {inspired})" if inspired else "",
+            # inspired_by를 mood에 포함 → Step 1에서 캐릭터/보컬/아트 설계에 활용
+            if inspired:
+                mood = f"{mood} [트렌드 힌트: {inspired}]"
+            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}",
                   file=sys.stderr)
             return theme, mood
     except Exception as e:

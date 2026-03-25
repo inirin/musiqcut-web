@@ -172,9 +172,14 @@ function renderGenStatus(sched) {
   } else if (sched.last_created_at) {
     const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
     const remaining = nextMs - Date.now();
-    const nextAbs = fmtAbs(new Date(nextMs).toISOString().replace('Z',''));
-    html += `<span class="gen-dot pending"></span>
-      <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)} <span class="gen-abs-time">(${nextAbs})</span></span>`;
+    if (remaining <= 0) {
+      html += `<span class="gen-dot pending"></span>
+        <span class="gen-primary-text">다음 생성 : 곧 시작</span>`;
+    } else {
+      const nextAbs = fmtAbs(new Date(nextMs).toISOString().replace('Z',''));
+      html += `<span class="gen-dot pending"></span>
+        <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)} <span class="gen-abs-time">(${nextAbs})</span></span>`;
+    }
   } else {
     html += `<span class="gen-dot pending"></span>
       <span class="gen-primary-text">대기 중</span>`;
