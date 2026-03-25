@@ -267,10 +267,10 @@ async def render_video(
         concat_tmp.unlink(missing_ok=True)
         concat_tmp = padded
 
-    # 5. 자막 SRT 생성
+    # 5. 자막 SRT 생성 (비활성화)
     srt_path = None
-    if whisper_lyrics or scenes:
-        srt_path = _generate_srt(scenes, out_path, whisper_lyrics=whisper_lyrics)
+    # if whisper_lyrics or scenes:
+    #     srt_path = _generate_srt(scenes, out_path, whisper_lyrics=whisper_lyrics)
 
     # 6. 오디오 합성 + 자막 → 최종 영상
     if srt_path and srt_path.exists() and srt_path.stat().st_size > 10:

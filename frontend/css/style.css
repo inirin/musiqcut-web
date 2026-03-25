@@ -218,7 +218,7 @@ textarea { resize: vertical; min-height: 80px; }
 ══════════════════════════════════════════ */
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 .project-card {
@@ -741,7 +741,7 @@ pre {
 /* ── 태블릿 (641~900px) ── */
 @media (min-width: 641px) and (max-width: 900px) {
   main { padding: 24px 20px; }
-  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .modal { max-width: 480px; }
 }
 
@@ -806,16 +806,18 @@ pre {
 .res-value[data-level="high"] { color: var(--error); }
 
 /* 라이트박스 피드백 — .lightbox-fb-wrap 스타일은 위 .lightbox-info와 공유 */
-.lightbox-fb-row { margin-top: 6px; display: flex; gap: 6px; width: 100%; box-sizing: border-box; }
+#lightbox-fb-list:empty { display: none; }
+#lightbox-fb-list:empty + .lightbox-fb-row { margin-top: 0; }
+.lightbox-fb-row { margin-top: 8px; display: flex; gap: 8px; width: 100%; box-sizing: border-box; }
 .lightbox-fb-input {
-  flex: 1; padding: 6px 10px; border-radius: var(--radius-sm);
+  flex: 1; padding: 8px 10px; border-radius: var(--radius-sm);
   border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1);
   color: #fff; font-size: var(--text-sm); min-width: 0;
   transition: border-color 0.15s; box-sizing: border-box;
 }
 .lightbox-fb-input:focus { outline: none; border-color: var(--accent); }
 .lightbox-fb-btn {
-  padding: 6px 10px; border-radius: var(--radius-sm);
+  padding: 8px 10px; border-radius: var(--radius-sm);
   background: var(--accent); color: #fff; border: none;
   font-size: var(--text-sm); cursor: pointer; white-space: nowrap; flex-shrink: 0;
   transition: background 0.15s;
