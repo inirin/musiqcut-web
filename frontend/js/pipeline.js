@@ -342,19 +342,27 @@ function _addRetryButton(stepEl, step) {
   const id = window._currentProjectId;
 
   if (step === 3 || step === 4) {
-    // 실패 상태일 때만 이어서 생성 버튼 표시
-    if (stepEl.classList.contains('failed')) {
+    const isFailed = stepEl.classList.contains('failed');
+    if (isFailed) {
+      // 실패: 이어서 + 처음부터
       const btnResume = document.createElement('button');
       btnResume.className = 'btn btn-primary btn-sm';
       btnResume.textContent = `▶ 이어서 생성`;
       btnResume.onclick = (e) => { e.stopPropagation(); if (confirm(`이어서 생성하시겠습니까?`)) retryFromStep(id, step); };
       wrap.appendChild(btnResume);
+      const btnReset = document.createElement('button');
+      btnReset.className = 'btn btn-secondary btn-sm';
+      btnReset.textContent = `↺ 처음부터 재생성`;
+      btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${step}을 처음부터 재생성하시겠습니까?`)) retryFromStep(id, step, true); };
+      wrap.appendChild(btnReset);
+    } else {
+      // 완성: 재시도 하나만 (다른 스텝과 동일 스타일)
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary btn-sm';
+      btn.textContent = `↺ STEP ${step}부터 재시도`;
+      btn.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${step}부터 재시도하시겠습니까?`)) retryFromStep(id, step, true); };
+      wrap.appendChild(btn);
     }
-    const btnReset = document.createElement('button');
-    btnReset.className = 'btn btn-secondary btn-sm';
-    btnReset.textContent = `↺ 처음부터 재생성`;
-    btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${step}을 처음부터 재생성하시겠습니까?`)) retryFromStep(id, step, true); };
-    wrap.appendChild(btnReset);
   } else {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary btn-sm';
