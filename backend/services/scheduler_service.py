@@ -96,22 +96,26 @@ async def _generate_random_theme() -> tuple[str, str]:
         avoid = "\n".join(f"- {t}" for t in existing) if existing else "(없음)"
 
         prompt = f"""당신은 뮤지컬 애니메이션 숏폼 콘텐츠 기획자입니다.
-아래 실시간 트렌드 키워드에서 **영감을 받아** 완전히 새롭고 독창적인 작품 테마 1개와 분위기를 생성하세요.
-트렌드 키워드를 직접 사용하지 말고, 연관된 스토리/감정/상황으로 창의적으로 변환하세요.
-예: "스페이스X" → "달에 혼자 남겨진 우주비행사의 귀환", "벚꽃" → "천년 된 벚나무가 마지막 꽃을 피우는 이야기"
+아래 실시간 트렌드 키워드 중 하나를 골라, 그 키워드와 **자연스럽게 연결되는** 작품 테마를 만드세요.
 
-실시간 트렌드 키워드 (참고용):
+규칙:
+- 트렌드 키워드에서 1개를 선택하고, inspired_by에 어떤 키워드인지 명시
+- 키워드와의 연결고리가 누가 봐도 느껴져야 함 (너무 추상적 변환 금지)
+- 키워드 자체를 제목에 넣어도 되고, 관련 인물/사건/감정을 테마로 풀어도 됨
+- 예: "스페이스X" → "화성행 편도 티켓 - 돌아올 수 없는 우주비행사의 마지막 메시지"
+- 예: "김효진" → "빛나는 무대 뒤의 그림자 - 배우가 조명이 꺼진 뒤 홀로 남겨질 때"
+- 예: "블리자드" → "눈보라 속의 등대지기 - 세상에서 가장 외로운 겨울밤 당직"
+
+실시간 트렌드 키워드:
 {trends_text}
 
 장르는 자유: 역사, 판타지, SF, 로맨스, 코미디, 풍자, 호러, 다크 판타지, 성장드라마, 서사극, 슬라이스 오브 라이프, 모험, 미스터리, 뮤지컬, 문학 각색, 신화 재해석 등
-시대는 자유: 고대, 중세, 근대, 현대, 미래, 대체역사, 판타지 세계 등
-문화권은 자유: 한국, 일본, 중국, 유럽, 중동, 아프리카, 남미, 인도, 북유럽 신화 등 전 세계
 
 최근 생성된 테마 (중복 피할 것):
 {avoid}
 
 반드시 아래 JSON 형식으로만 응답하세요:
-{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어, 예: 비극적이고 장엄한)"}}"""
+{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "선택한 트렌드 키워드"}}"""
 
         response = await gemini_generate(
             model="gemini-2.5-flash",
@@ -122,8 +126,10 @@ async def _generate_random_theme() -> tuple[str, str]:
         data = _json.loads(text)
         theme = data.get("theme", "").strip()
         mood = data.get("mood", "auto").strip()
+        inspired = data.get("inspired_by", "")
         if theme:
-            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}",
+            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}"
+                  f" (트렌드: {inspired})" if inspired else "",
                   file=sys.stderr)
             return theme, mood
     except Exception as e:
