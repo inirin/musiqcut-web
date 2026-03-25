@@ -368,10 +368,23 @@ async def run_pipeline(
                     audio_file, lyrics, demucs_dir,
                     total_duration=actual_duration)
 
-                # 보컬 감지 실패 시 프로젝트 실패 처리 (스케줄러가 새 작품으로 재시도)
+                # 보컬 감지 실패 시 Step 1부터 재시도 (새 스토리/가사/음악)
                 vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
                 if vocal_count == 0:
-                    raise RuntimeError("보컬 감지 실패 — Whisper가 보컬을 인식하지 못함")
+                    _vocal_retry = getattr(emitter, '_vocal_retry', 0)
+                    if _vocal_retry >= 2:
+                        raise RuntimeError("보컬 감지 실패 — 재시도 2회 소진")
+                    emitter._vocal_retry = _vocal_retry + 1
+                    print(f"[STEP2] 보컬 감지 실패 → Step 1부터 재시도 "
+                          f"({emitter._vocal_retry}/2)", file=sys.stderr)
+                    await emitter.update(2, "running",
+                        f"보컬 감지 실패, Step 1부터 재시도 ({emitter._vocal_retry}/2)")
+                    # 기존 파일 전부 삭제
+                    await _clean_step_files(project_id, 1)
+                    # Step 1부터 재귀 실행
+                    return await run_pipeline(
+                        project_id, theme, mood, emitter,
+                        resume_from=0, length=length)
 
             # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만)
             if not _cached_lyrics:
