@@ -6,7 +6,7 @@ function isLipSync(meta) {
   const hasVocal = meta._has_vocal !== undefined ? meta._has_vocal
     : (meta.vocal_lines || []).some(l => l.trim() && !_NON_VOCAL.has(l.trim()));
   const shot = meta.shot_type || 'medium';
-  const isVocalist = meta.is_vocalist !== undefined ? meta.is_vocalist : true;
+  const isVocalist = meta.is_vocalist !== undefined ? meta.is_vocalist : false;
   return hasVocal && (shot === 'closeup' || shot === 'medium') && isVocalist;
 }
 
@@ -44,7 +44,7 @@ document.getElementById('create-form')?.addEventListener('submit', async e => {
 
 // ── 파이프라인 실행 ───────────────────────────────
 
-const STEP_NAMES = ['', '스토리/컨셉 생성', '음악 생성', '장면 구성 + 이미지 생성', '영상 클립 생성', '최종 영상 합성'];
+const STEP_NAMES = ['', '스토리/컨셉 생성', '음악 생성', '이미지 생성 (Imagen)', '영상 클립 생성 (Wan S2V)', '최종 영상 합성'];
 const STEP_ICONS = ['', '✍️', '🎵', '🖼️', '🎞️', '🎬'];
 
 let currentProjectId = null;
@@ -569,7 +569,7 @@ async function _showLightboxItemInner() {
 
     const lines = (meta.vocal_lines || []).filter(l => l.trim());
     const shotType = meta.shot_type || 'medium';
-    const isEchoMimic = isLipSync(meta);
+    const isLipSyncClip = isLipSync(meta);
     const audioRow = audioEl ? audioEl.closest('.lightbox-audio-row') : null;
     if (audioRow) audioRow.style.display = 'none';  // 오디오 UI 숨김 (싱크 재생은 유지)
     const startSec = meta.start_sec || 0;
@@ -577,7 +577,7 @@ async function _showLightboxItemInner() {
 
     // 텍스트 표시: 타입별 라벨 + 내용
     function _infoHtml() {
-      const badge = isEchoMimic ? '<span class="lb-badge echo">보컬</span> ' : '';
+      const badge = isLipSyncClip ? '<span class="lb-badge echo">보컬</span> ' : '';
       const shotLabel = `<span class="lb-shot">${shotType}</span>`;
       const vocalText = lines.filter(l => !_NON_VOCAL.has(l.trim())).join(' / ');
 
@@ -585,15 +585,16 @@ async function _showLightboxItemInner() {
         const imgBadge = isLipSync(meta) ? '<span class="lb-badge echo">보컬</span> ' : '';
         return `${imgBadge}${shotLabel} <span class="lb-label">이미지 프롬프트</span><br><span class="lb-prompt">${meta.image_prompt || meta.description || ''}</span>`;
       }
-      // 모든 클립: 자막 + 장면 설명
+      // 모든 클립: 자막 + 실제 프롬프트 (영어)
       let parts = `${badge}${shotLabel}`;
       if (vocalText) {
         parts += `<br><span class="lb-vocal">"${vocalText}"</span>`;
       }
-      if (meta.description) {
-        parts += `<br><span class="lb-prompt">${meta.description}</span>`;
+      const promptText = meta.image_prompt || meta.description || '';
+      if (promptText) {
+        parts += `<br><span class="lb-prompt">${promptText}</span>`;
       }
-      if (!vocalText && !meta.description) {
+      if (!vocalText && !promptText) {
         parts += ` <span class="lb-label">(instrumental)</span>`;
       }
       return parts;
@@ -605,7 +606,7 @@ async function _showLightboxItemInner() {
     } else if (!window._currentProjectId || endSec <= startSec) {
       if (audioRow) audioRow.style.display = 'none';
     } else {
-      const audioSrc = isEchoMimic
+      const audioSrc = isLipSyncClip
         ? `/storage/projects/${window._currentProjectId}/demucs/htdemucs/output/vocals.wav`
         : `/storage/projects/${window._currentProjectId}/music/output.mp3`;
 

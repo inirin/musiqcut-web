@@ -25,6 +25,12 @@ storage/temp/
 *.db
 *.db-journal
 *.db-wal
+*.db.backup_*
+
+# 테스트 데이터
+test_*.py
+storage/*.png
+storage/*.mp4
 
 # 로그
 logs/

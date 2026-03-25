@@ -12,7 +12,8 @@ async def init_db():
                 title       TEXT,
                 theme       TEXT NOT NULL,
                 mood        TEXT NOT NULL,
-                scene_count INTEGER DEFAULT 4,
+                length      TEXT DEFAULT 'short',
+                source      TEXT DEFAULT 'manual',
                 status      TEXT DEFAULT 'pending',
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -59,24 +60,19 @@ async def init_db():
                 schedule_type   TEXT DEFAULT 'generation',
                 enabled         INTEGER DEFAULT 0,
                 interval_hours  REAL DEFAULT 2.0,
-                last_run_at     DATETIME,
+                last_success_at DATETIME,
+                last_failure_at DATETIME,
+                last_failure_reason TEXT,
                 updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS api_usage (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                api_name    TEXT,
-                used_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-                month_year  TEXT
-            );
         """)
         await db.commit()
 
-        # 기존 DB 마이그레이션
+        # 기존 DB 마이그레이션 (새 컬럼 추가 — 이미 있으면 무시)
         for col, sql in [
-            ("scene_count", "ALTER TABLE projects ADD COLUMN scene_count INTEGER DEFAULT 4"),
             ("length", "ALTER TABLE projects ADD COLUMN length TEXT DEFAULT 'short'"),
-            ("schedule_type", "ALTER TABLE auto_schedule ADD COLUMN schedule_type TEXT DEFAULT 'generation'"),
+            ("source", "ALTER TABLE projects ADD COLUMN source TEXT DEFAULT 'manual'"),
         ]:
             try:
                 await db.execute(sql)

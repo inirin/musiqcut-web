@@ -35,10 +35,10 @@ SCHEDULER = "simple"
 SAMPLER = "euler"
 CFG = 1.0
 SHIFT = 8.0
-WIDTH = 512           # 세로 2:3 (EchoMimic과 동일)
-HEIGHT = 768
+WIDTH = 576           # 세로 9:16
+HEIGHT = 1024
 FPS = 16              # Wan I2V 네이티브 FPS (ComfyUI 생성용)
-OUTPUT_FPS = 25       # 최종 출력 FPS (EchoMimic과 통일)
+OUTPUT_FPS = 24       # 최종 출력 FPS (LTX와 통일)
 DEFAULT_FRAMES = 81   # 기본 프레임 수 (duration 미지정 시)
 
 CLIP_DURATION = 5  # 장면 수 계산 기준 (초)
@@ -283,7 +283,11 @@ async def generate_video_clips(
 
         src_img = str(image_path(project_id, scene.scene_no))
         img_name = f"scene_{project_id[:8]}_{scene.scene_no:02d}.png"
-        shutil.copy2(src_img, str(input_dir / img_name))
+        # 소스 이미지를 Wan 해상도로 리사이즈하여 ComfyUI input에 복사
+        img = Image.open(src_img)
+        if img.size != (WIDTH, HEIGHT):
+            img = img.resize((WIDTH, HEIGHT), Image.LANCZOS)
+        img.save(str(input_dir / img_name))
 
         shot_type = getattr(scene, 'shot_type', 'medium')
         if shot_type == 'wide':
@@ -294,7 +298,7 @@ async def generate_video_clips(
                 f'only things that naturally move in reality should move '
                 f'(e.g. water flows, clouds drift, leaves fall, fire flickers, wind blows), '
                 f'rigid objects stay still, no people appearing, '
-                f'{scene.description}'
+                f'{getattr(scene, "image_prompt", scene.description)}'
             )
         else:
             # 클로즈업/미디엄: 캐릭터 모션 (립싱크 아닌 클립 — 입 닫힌 채)
@@ -302,7 +306,7 @@ async def generate_video_clips(
                 f'Animated character with mouth firmly closed the entire time, '
                 f'lips sealed shut, never opens mouth, '
                 f'natural body sway, expressive eyes, gentle head movement, '
-                f'cinematic lighting, {scene.description}'
+                f'cinematic lighting, {getattr(scene, "image_prompt", scene.description)}'
             )
         prompts_to_try = [main_prompt]
         prompts_to_try.extend(FALLBACK_PROMPTS)

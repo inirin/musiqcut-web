@@ -46,6 +46,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 아트 스타일:
 - 테마와 분위기에 가장 어울리는 **애니메이션 아트 스타일**을 자유롭게 선택하세요
 - 예시: Pixar/Disney 3D, 스튜디오 지브리 수채화, 셀 애니메이션, 사이버펑크 네온, 판타지 유화, 미니멀 플랫 디자인, 빈티지 레트로, 누아르 등
+- **금지: 실사(photorealistic), 사진(photograph), 하이퍼리얼리즘** — 반드시 애니메이션/일러스트 스타일이어야 함
 - 선택한 스타일을 art_style 필드에 영문으로 명시하세요 (이 스타일이 모든 장면에 일관 적용됩니다)
 
 영상 연출 참고 (가사에 반영):
@@ -64,7 +65,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
   "title": "작품 제목 (한국어)",
   "lyrics": "전체 가사 (줄바꿈 포함, 한국어, 반드시 {lyrics_lines_desc})",
   "music_prompt": "Suno AI용 영문 음악 스타일 프롬프트 (예: epic orchestral, upbeat pop). 반드시 보컬이 포함된 곡이어야 함 (instrumental 금지). 보컬은 주인공 캐릭터에 어울리는 성별/연령대/음색으로 지정. 악기 나열보다 보컬 스타일/감정을 우선 기술할 것. 단, 오페라/성악/벨칸토 등 입을 크게 벌리는 창법은 금지 — 자연스러운 대중음악 창법만 사용 (pop, ballad, R&B, folk, rock, hip-hop, jazz 등). {suno_hint}",
-  "art_style": "선택한 아트 스타일 (영문, 예: 'Pixar-style 3D animation' 또는 'Studio Ghibli watercolor' 또는 'cyberpunk neon cel-shading')",
+  "art_style": "선택한 애니메이션 아트 스타일 (영문, 예: 'Pixar-style 3D animation' 또는 'Studio Ghibli watercolor' 또는 'cyberpunk neon cel-shading' — photorealistic/photograph 금지)",
   "characters": [
     {{
       "name": "캐릭터 이름/별칭 (한국어)",
@@ -79,7 +80,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 # ── STEP 3 전반부: 장면 구성 (음악 길이 기반) ──────────────
 SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입니다.
 아래 스토리를 기반으로 {scene_count}개의 장면을 구성하세요.
-각 장면은 ~5초 영상 클립(512×768 세로)이며, AI 이미지 생성 + AI 영상 변환에 사용됩니다.
+각 장면은 ~5초 영상 클립(576×1024 세로 9:16)이며, AI 이미지 생성 + AI 영상 변환에 사용됩니다.
 반드시 JSON 형식으로만 응답하세요.
 
 작품 정보:
@@ -102,7 +103,7 @@ SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입
 
 이미지 스타일:
 - 아트 스타일: {art_style} (모든 장면에 일관 적용)
-- 해상도: 512×768 (2:3 세로, 모바일 숏폼 최적)
+- 해상도: 576×1024 (9:16 세로, 모바일 숏폼 최적)
 - 캐릭터는 반드시 성인 또는 청소년(10대 후반~20대)으로 설정 (어린이/유아 금지)
 
 각 장면은 가사의 흐름에 맞춰 감정적 전개를 보여줘야 합니다.
@@ -115,7 +116,7 @@ SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입
       "shot_type": "closeup 또는 medium 또는 wide (반드시 영문 소문자)",
       "is_vocalist": true/false (이 장면이 주인공(보컬리스트)의 클로즈업/미디엄인 경우에만 true. 조연/충신/배경인물이면 무조건 false. 와이드샷은 무조건 false. 오직 노래하는 주인공 1인 장면만 true),
       "description": "장면 설명 (한국어, 샷 타입/캐릭터 동작/감정 포함, 예: '[클로즈업] 주인공이 눈을 감고 미소짓는다')",
-      "image_prompt": "2:3 vertical portrait, [shot_type에 맞는 구도] {art_style}, [상세 영문 프롬프트, 배경/조명/캐릭터 포즈/표정 포함]"
+      "image_prompt": "vertical portrait composition, [shot_type에 맞는 구도] {art_style}, [상세 영문 프롬프트, 배경/조명/캐릭터 포즈/표정 포함]"
     }}
   ]
 }}
@@ -128,7 +129,7 @@ image_prompt 작성 규칙:
 - 미디엄샷: "medium shot, upper body visible, dynamic hand gestures, head tilt, breathing motion, emotional body language"
 - 와이드샷: "wide cinematic shot, full body silhouette, detailed environment, atmospheric lighting, character in motion"
 - 모든 프롬프트에 조명, 분위기, 색감, 캐릭터의 감정 상태를 구체적으로 포함
-- **모든 image_prompt에 반드시 포함**: "no text, no subtitles, no captions, no letters, no watermark, no title" — 이미지 안에 어떤 글자도 절대 들어가면 안 됨
+- **모든 image_prompt에 반드시 포함**: "no text, no subtitles, no captions, no letters, no watermark, no title, not photorealistic, not a photograph" — 이미지 안에 글자 금지 + 실사/사진풍 금지
 - 모든 프롬프트에 조명, 분위기, 색감, 캐릭터의 감정 상태를 구체적으로 포함하되, 매번 다채롭고 창의적으로"""
 
 

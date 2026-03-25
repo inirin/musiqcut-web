@@ -17,10 +17,10 @@ from backend.services.gemini_image_service import generate_images
 from backend.services.suno_service import generate_music, measure_audio_duration
 from backend.services.wan_video_service import generate_video_clips as wan_generate_clips
 from backend.services.wan_video_service import get_clip_duration
-from backend.services.echomimic_service import is_available as echo_available
-from backend.services.echomimic_service import generate_lipsync_clip
+from backend.services.wan_s2v_service import is_available as s2v_available
+from backend.services.wan_s2v_service import generate_lipsync_clip as s2v_generate_lipsync
 from backend.services.lipsync_precheck import separate_vocals
-from backend.services.creatomate_service import render_video
+from backend.services.ffmpeg_service import render_video
 from backend.services.lyrics_sync_service import extract_lyrics_timestamps
 from backend.models.project import GeneratedScript, ScriptScene
 
@@ -35,6 +35,28 @@ def _free_comfyui_vram(tag: str = ""):
             headers={"Content-Type": "application/json"})
         _ur.urlopen(_req)
         print(f"[STEP4] VRAM 해제 완료 ({tag})", file=sys.stderr)
+    except Exception:
+        pass
+
+
+def _clear_comfyui_queue():
+    """ComfyUI 대기 큐 + 현재 실행 중인 작업 취소 — 재시작 시 이전 워크플로우 제거."""
+    try:
+        import urllib.request as _ur
+        # 큐 대기 항목 삭제
+        _req = _ur.Request(
+            "http://127.0.0.1:8189/queue",
+            data=json.dumps({"clear": True}).encode(),
+            headers={"Content-Type": "application/json"})
+        _ur.urlopen(_req)
+        # 현재 실행 중인 작업 중단
+        _req2 = _ur.Request(
+            "http://127.0.0.1:8189/interrupt",
+            data=b"",
+            headers={"Content-Type": "application/json"},
+            method="POST")
+        _ur.urlopen(_req2)
+        print("[STEP4] ComfyUI 큐 클리어 + 현재 작업 중단", file=sys.stderr)
     except Exception:
         pass
 
@@ -56,9 +78,12 @@ async def _log_step(project_id: str, step_no: int, step_name: str,
     async with aiosqlite.connect(DB_PATH) as db:
         now = datetime.utcnow().isoformat()
         if status == "running":
-            # 시작: started_at 기록, finished_at은 비움
+            # 기존 행 삭제 후 새로 삽입 (resume 시 중복 방지)
             await db.execute(
-                """INSERT OR REPLACE INTO pipeline_steps
+                "DELETE FROM pipeline_steps WHERE project_id=? AND step_no=?",
+                (project_id, step_no))
+            await db.execute(
+                """INSERT INTO pipeline_steps
                    (project_id, step_no, step_name, status, started_at,
                     finished_at, output_data, error_msg)
                    VALUES (?,?,?,?,?,NULL,?,?)""",
@@ -236,6 +261,15 @@ async def run_pipeline(
             all_completed = await _get_completed_steps(project_id)
             completed = {k: v for k, v in all_completed.items() if k < resume_from}
             await _clean_step_files(project_id, resume_from)
+            # 완료된 스텝의 원래 시작 시간을 emitter에 복원 (0초 소요 버그 방지)
+            async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                rows = await db.execute_fetchall(
+                    "SELECT step_no, started_at FROM pipeline_steps "
+                    "WHERE project_id=? AND status='done'", (project_id,))
+                for r in rows:
+                    if r["started_at"]:
+                        emitter._step_starts[r["step_no"]] = r["started_at"]
         else:
             completed = {}
 
@@ -313,7 +347,7 @@ async def run_pipeline(
                                         "start": t.get("start", i * 5.0),
                                         "end": t.get("end", (i+1) * 5.0),
                                         "has_vocal": t.get("has_vocal", False),
-                                        "words": []})
+                                        "words": t.get("words", [])})
                 scene_count = max(scene_count, len(timed_lines))
         try:
             if not timed_lines:
@@ -339,7 +373,28 @@ async def run_pipeline(
                     ci = 0
                     for sg in timed_lines:
                         if sg["text"].strip() and ci < len(corrected):
+                            old_text = sg["text"]
                             sg["text"] = corrected[ci]
+                            # words 텍스트도 보정 (단어 수 동일하면 1:1, 다르면 균등 배분)
+                            words = sg.get("words", [])
+                            if words and corrected[ci].strip():
+                                import re as _re
+                                new_words = [_re.sub(r'[.,!?;:~…\"\'\-]+', '', w).strip()
+                                             for w in corrected[ci].split()]
+                                new_words = [w for w in new_words if w]
+                                if len(new_words) == len(words):
+                                    for wi, nw in enumerate(new_words):
+                                        words[wi]["text"] = nw
+                                else:
+                                    # 단어 수 불일치 → 타이밍 균등 배분
+                                    t_start = words[0]["start"]
+                                    t_end = words[-1]["end"]
+                                    step = (t_end - t_start) / len(new_words) if new_words else 0
+                                    sg["words"] = [
+                                        {"text": nw,
+                                         "start": round(t_start + j * step, 3),
+                                         "end": round(t_start + (j + 1) * step, 3)}
+                                        for j, nw in enumerate(new_words)]
                             ci += 1
                     print(f"[LyricsSync] Gemini 가사 보정 완료 ({ci}줄)", file=sys.stderr)
                 except Exception as e:
@@ -362,7 +417,8 @@ async def run_pipeline(
         early_lyrics = []
         if timed_lines:
             early_lyrics = [{"text": sg["text"], "start": sg["start"],
-                             "end": sg["end"], "has_vocal": sg.get("has_vocal", False)}
+                             "end": sg["end"], "has_vocal": sg.get("has_vocal", False),
+                             "words": sg.get("words", [])}
                             for sg in timed_lines]
             script_data_tmp = json.loads(lp.read_text(encoding="utf-8"))
             script_data_tmp["whisper_lyrics"] = early_lyrics
@@ -373,7 +429,7 @@ async def run_pipeline(
         await _log_step(project_id, 2, "음악 생성", "done",
             {"audio_path": audio_file, "actual_duration": round(actual_duration, 1)})
         await emitter.update(2, "done",
-            f"음악 + 가사 분석 완료! ({actual_duration:.0f}초, {scene_count}장면)",
+            f"음악 + 가사 분석 완료!",
             {"audio_url": f"/storage/projects/{project_id}/music/output.mp3",
              "whisper_lyrics": early_lyrics})
 
@@ -433,6 +489,7 @@ async def run_pipeline(
                          "has_vocal": bool(sc.vocal_lines and sc.vocal_lines[0].strip())}
                 if timed_lines and i < len(timed_lines):
                     entry["has_vocal"] = timed_lines[i].get("has_vocal", False)
+                    entry["words"] = timed_lines[i].get("words", [])
                 whisper_lyrics.append(entry)
             script_data["whisper_lyrics"] = whisper_lyrics
             scenes_data = []
@@ -446,22 +503,21 @@ async def run_pipeline(
                 json.dumps(script_data, ensure_ascii=False, indent=2),
                 encoding="utf-8"
             )
-            await emitter.update(2, "done",
-                f"음악 생성 완료! ({actual_duration:.0f}초, 가사 {len(whisper_lyrics)}줄)",
-                {"audio_url": f"/storage/projects/{project_id}/music/output.mp3",
-                 "whisper_lyrics": whisper_lyrics})
+            # STEP 2 done은 라인 384에서 이미 전송됨 — 중복 전송 제거
 
-            # 3-2: 이미지 생성
+            # 3-2: 이미지 생성 (Imagen 4 API)
             await emitter.update(3, "running",
                 f"Imagen으로 {scene_count}개 이미지 생성 중...")
             async def _step3_progress(current, total):
                 urls = [f"/storage/projects/{project_id}/images/scene_{i+1:02d}.png"
                         for i in range(current)]
+                # 생성 중인 이미지 포함한 진행 수
+                display = min(current + 1, total)
                 await emitter.update(3, "running",
-                    f"이미지 생성 중... {current}/{total}",
-                    {"current": current, "total": total, "image_urls": urls})
+                    f"이미지 생성 중... {display}/{total}",
+                    {"current": display, "total": total, "image_urls": urls})
                 await _update_step_progress(project_id, 3,
-                    "장면 구성 + 이미지", current, total)
+                    "장면 구성 + 이미지", display, total)
 
             image_files = await generate_images(
                 project_id, scenes, progress_cb=_step3_progress)
@@ -473,9 +529,9 @@ async def run_pipeline(
                     f"/storage/projects/{project_id}/images/scene_{i+1:02d}.png"
                     for i in range(len(image_files))]})
 
-        # ── STEP 4: 이미지→영상 클립 (클로즈업=EchoMimicV3, 나머지=Wan I2V) ──
+        # ── STEP 4: 이미지→영상 클립 (보컬=Wan S2V 립싱크, 나머지=Wan I2V) ──
         current_step = 4
-        use_echo = echo_available()
+        use_s2v = s2v_available()
         clip1 = clip_path(project_id, 1)
         if 4 in completed and clip1.exists():
             clips_dir = clip_path(project_id, 1).parent
@@ -487,8 +543,10 @@ async def run_pipeline(
                                      for i in range(clip_count)
                                  ]})
         else:
-            # STEP 4 시작 전 VRAM 정리 (이전 실행 잔여 모델 해제)
-            await asyncio.to_thread(_free_comfyui_vram, "STEP4 시작 전 초기화")
+            # STEP 4 시작 전 ComfyUI 큐 클리어 + VRAM 정리
+            # (재시작 시 이전 워크플로우가 큐에 남아있는 문제 방지)
+            await asyncio.to_thread(_clear_comfyui_queue)
+            await asyncio.to_thread(_free_comfyui_vram, "Qwen→Wan STEP4 시작")
 
             # 보컬 분리 (EchoMimic + Whisper 판단용)
             demucs_dir = str(Path(lyrics_path(project_id)).parent / "demucs")
@@ -508,32 +566,38 @@ async def run_pipeline(
             if _vocal_map:
                 print(f"[STEP4] STEP 2 보컬 분석 결과 재사용 ({sum(_vocal_map.values())}/{len(_vocal_map)} 보컬)",
                       file=sys.stderr)
+                print(f"[STEP4] _vocal_map: {_vocal_map}", file=sys.stderr)
             else:
-                print("[STEP4] _has_vocal 캐시 없음, 전체 보컬 판정 스킵", file=sys.stderr)
+                # _has_vocal 캐시 없으면 scenes 객체의 vocal_lines로 폴백
+                print("[STEP4] _has_vocal 캐시 없음, vocal_lines 폴백 사용", file=sys.stderr)
+                for sc in scenes:
+                    vl = getattr(sc, 'vocal_lines', [])
+                    has = bool(vl and any(l.strip() for l in vl))
+                    _vocal_map[sc.scene_no] = has
 
             def _has_vocals(sc) -> bool:
                 return _vocal_map.get(sc.scene_no, False)
 
-            echo_indices = [i for i, s in enumerate(scenes)
-                            if getattr(s, 'shot_type', '') in ('closeup', 'medium')
-                            and _has_vocals(s)
-                            and getattr(s, 'is_vocalist', True)]  # 보컬 주체만
-            has_echo = use_echo and len(echo_indices) > 0
+            s2v_indices = [i for i, s in enumerate(scenes)
+                           if getattr(s, 'shot_type', '') in ('closeup', 'medium')
+                           and _has_vocals(s)
+                           and getattr(s, 'is_vocalist', False)]
+            has_s2v = use_s2v and len(s2v_indices) > 0
 
             engine_parts = []
-            if has_echo:
-                engine_parts.append(f"EchoMimicV3 립싱크 {len(echo_indices)}개 (closeup+medium)")
-            non_closeup = len(scenes) - len(echo_indices) if has_echo else len(scenes)
-            if non_closeup > 0:
-                engine_parts.append(f"Wan 2.2 I2V {non_closeup}개")
+            if has_s2v:
+                engine_parts.append(f"Wan 2.2 S2V {len(s2v_indices)}개 (보컬 립싱크)")
+            non_ltx = len(scenes) - len(s2v_indices)
+            if non_ltx > 0:
+                engine_parts.append(f"Wan 2.2 I2V {non_ltx}개 (wide)")
             engine_desc = " + ".join(engine_parts)
 
-            # 비보컬 클립 인덱스 (Wan이 먼저 처리됨)
-            non_closeup_idx = [i for i in range(len(scenes)) if i not in echo_indices] if has_echo else list(range(len(scenes)))
+            # Wan 대상 인덱스 (wide shots)
+            wan_indices = [i for i in range(len(scenes)) if i not in s2v_indices]
 
             # 초기 클립 슬롯 — 실제 첫 처리 클립에 스피너
             init_slots = []
-            first_idx = non_closeup_idx[0] if non_closeup_idx else (echo_indices[0] if echo_indices else 0)
+            first_idx = wan_indices[0] if wan_indices else (s2v_indices[0] if s2v_indices else 0)
             for i, sc in enumerate(scenes):
                 sno = sc.scene_no
                 init_slots.append({
@@ -544,9 +608,10 @@ async def run_pipeline(
                     "duration": getattr(sc, 'duration', 0),
                     "vocal_lines": getattr(sc, 'vocal_lines', []),
                     "description": getattr(sc, 'description', ''),
+                    "image_prompt": getattr(sc, 'image_prompt', ''),
                     "shot_type": getattr(sc, 'shot_type', 'medium'),
                     "_has_vocal": _has_vocals(sc),
-                    "is_vocalist": getattr(sc, "is_vocalist", True),
+                    "is_vocalist": getattr(sc, "is_vocalist", False),
                 })
             await emitter.update(4, "running",
                                  f"{engine_desc} 영상 클립 생성 중...",
@@ -574,7 +639,8 @@ async def run_pipeline(
                         "vocal_lines": getattr(sc, 'vocal_lines', []),
                         "description": getattr(sc, 'description', ''),
                         "shot_type": getattr(sc, 'shot_type', 'medium'),
-                        "is_vocalist": getattr(sc, "is_vocalist", True),
+                        "_has_vocal": _has_vocals(sc),
+                        "is_vocalist": getattr(sc, "is_vocalist", False),
                     }
                     if clip_files[i]:
                         slot["status"] = "done"
@@ -584,10 +650,12 @@ async def run_pipeline(
                     else:
                         slot["status"] = "pending"
                     clip_slots.append(slot)
-                data = {"current": done_count, "total": len(scenes),
+                # 생성 중인 클립 포함한 진행 수
+                display_count = done_count + (1 if _current_clip_idx >= 0 else 0)
+                data = {"current": display_count, "total": len(scenes),
                         "clip_slots": clip_slots}
                 await emitter.update(4, "running",
-                    f"영상 클립 생성 중... {done_count}/{len(scenes)}", data)
+                    f"영상 클립 생성 중... {display_count}/{len(scenes)}", data)
                 # DB에도 저장 (dashboard 폴링용)
                 async with aiosqlite.connect(DB_PATH) as db:
                     await db.execute(
@@ -596,60 +664,59 @@ async def run_pipeline(
                         (json.dumps(data, ensure_ascii=False), project_id, 4))
                     await db.commit()
 
-            # 비클로즈업 장면 → Wan I2V
-            non_closeup_scenes = [s for i, s in enumerate(scenes)
-                                  if i not in echo_indices] if has_echo else scenes
-            non_closeup_images = [f for i, f in enumerate(image_files)
-                                  if i not in echo_indices] if has_echo else image_files
-
-
-            if non_closeup_scenes:
-                _wan_done_count = 0
-                async def _wan_progress(current, total):
-                    nonlocal _wan_done_count, _current_clip_idx
-                    if current > _wan_done_count:
-                        idx = non_closeup_idx[current - 1]
-                        clip_files[idx] = str(clip_path(project_id,
-                                              scenes[idx].scene_no))
-                        _wan_done_count = current
-                    # 다음 클립을 running으로 표시
-                    if current < total:
-                        _current_clip_idx = non_closeup_idx[current]
-                    else:
-                        _current_clip_idx = -1
-                    await _step4_progress_update()
-
-                wan_results = await wan_generate_clips(
-                    project_id, non_closeup_scenes, non_closeup_images,
-                    progress_cb=_wan_progress)
-                for j, idx in enumerate(non_closeup_idx):
-                    clip_files[idx] = wan_results[j]
-
-            # 모델 전환: Wan → EchoMimic
-            if has_echo and vocals_path:
-                if non_closeup_scenes:
-                    await asyncio.to_thread(_free_comfyui_vram, "Wan→EchoMimic")
-                for idx in echo_indices:
+            # 보컬 립싱크 먼저 → Wan 2.2 S2V (시간이 오래 걸리므로 우선 처리)
+            if has_s2v and vocals_path:
+                for idx in s2v_indices:
                     _current_clip_idx = idx
                     await _step4_progress_update()  # 시작 시 스피너 표시
                     scene = scenes[idx]
                     start_sec = scene.start_sec if scene.start_sec > 0 else idx * clip_duration
                     scene_dur = scene.duration if scene.duration > 0 else clip_duration
                     try:
-                        result = await generate_lipsync_clip(
+                        result = await s2v_generate_lipsync(
                             project_id, scene.scene_no, vocals_path,
                             scene_start_sec=start_sec,
                             clip_duration=scene_dur,
-                            prompt=scene.description)
+                            prompt=getattr(scene, 'image_prompt', scene.description),
+                            has_vocal=_has_vocals(scene),
+                            is_vocalist=getattr(scene, 'is_vocalist', True),
+                            shot_type=getattr(scene, 'shot_type', 'medium'))
                         clip_files[idx] = result
                     except Exception as e:
-                        print(f"[STEP4] EchoMimic 실패 (장면 {scene.scene_no}), "
-                              f"Wan I2V 폴백: {e}", file=sys.stderr)
-                        await asyncio.to_thread(_free_comfyui_vram, "EchoMimic→Wan 폴백")
-                        fallback = await wan_generate_clips(
-                            project_id, [scene], [image_files[idx]])
-                        clip_files[idx] = fallback[0]
+                        print(f"[STEP4] S2V 실패 (장면 {scene.scene_no}), "
+                              f"정지 이미지 폴백: {e}", file=sys.stderr)
+                        from backend.services.wan_video_service import _ffmpeg_still_video
+                        still_out = clip_path(project_id, scene.scene_no)
+                        await _ffmpeg_still_video(image_files[idx], still_out, duration=scene_dur)
+                        clip_files[idx] = str(still_out)
                     await _step4_progress_update()
+
+            # 와이드/비보컬 → Wan I2V
+            wan_scenes = [s for i, s in enumerate(scenes) if i in wan_indices]
+            wan_images = [f for i, f in enumerate(image_files) if i in wan_indices]
+
+            if wan_scenes:
+                if has_s2v and vocals_path:
+                    await asyncio.to_thread(_free_comfyui_vram, "S2V→Wan I2V")
+                _wan_done_count = 0
+                async def _wan_progress(current, total):
+                    nonlocal _wan_done_count, _current_clip_idx
+                    if current > _wan_done_count:
+                        idx = wan_indices[current - 1]
+                        clip_files[idx] = str(clip_path(project_id,
+                                              scenes[idx].scene_no))
+                        _wan_done_count = current
+                    if current < total:
+                        _current_clip_idx = wan_indices[current]
+                    else:
+                        _current_clip_idx = -1
+                    await _step4_progress_update()
+
+                wan_results = await wan_generate_clips(
+                    project_id, wan_scenes, wan_images,
+                    progress_cb=_wan_progress)
+                for j, idx in enumerate(wan_indices):
+                    clip_files[idx] = wan_results[j]
 
             clip_files = [f for f in clip_files if f]  # None 제거
 
@@ -667,8 +734,10 @@ async def run_pipeline(
                     "duration": getattr(sc, 'duration', 0),
                     "vocal_lines": getattr(sc, 'vocal_lines', []),
                     "description": getattr(sc, 'description', ''),
+                    "image_prompt": getattr(sc, 'image_prompt', ''),
                     "shot_type": getattr(sc, 'shot_type', 'medium'),
-                    "is_vocalist": getattr(sc, "is_vocalist", True),
+                    "_has_vocal": _has_vocals(sc),
+                    "is_vocalist": getattr(sc, "is_vocalist", False),
                 })
             await _log_step(project_id, 4, "영상 클립 생성", "done",
                             {"clip_count": len(clip_files), "clip_slots": final_slots})
@@ -681,8 +750,25 @@ async def run_pipeline(
         await emitter.update(5, "running", "최종 영상 합성 중...")
         await _log_step(project_id, 5, "영상 합성", "running")
 
+        # scenes 데이터를 dict로 변환 (자막용)
+        scenes_dicts = [
+            {"scene_no": s.scene_no,
+             "start_sec": getattr(s, 'start_sec', 0),
+             "duration": getattr(s, 'duration', 5),
+             "vocal_lines": getattr(s, 'vocal_lines', [])}
+            for s in scenes
+        ]
+        # whisper_lyrics 로드 (정밀 타이밍 자막용)
+        _whisper_lyrics = None
+        try:
+            _ldata = json.loads(lp.read_text(encoding="utf-8"))
+            _whisper_lyrics = _ldata.get("whisper_lyrics")
+        except Exception:
+            pass
+
         final_video = await render_video(
-            project_id, clip_files, audio_file
+            project_id, clip_files, audio_file,
+            scenes=scenes_dicts, whisper_lyrics=_whisper_lyrics
         )
         await _log_step(project_id, 5, "영상 합성", "done",
                         {"video_path": final_video})

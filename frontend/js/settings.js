@@ -37,8 +37,11 @@ async function loadSettings() {
       if (toggle) toggle.checked = !!sched.enabled;
       if (interval) interval.value = sched.interval_hours || (type === 'feedback' ? 6 : 2);
       if (status) {
-        const last = sched.last_run_at ? ' · 마지막: ' + new Date(sched.last_run_at + 'Z').toLocaleString('ko-KR') : '';
-        status.textContent = sched.enabled ? `활성 (${sched.interval_hours}시간 간격)${last}` : '비활성';
+        if (type === 'generation') {
+          status.innerHTML = renderGenStatus(sched);
+        } else {
+          status.textContent = sched.enabled ? '활성' : '비활성';
+        }
       }
     }
   } catch {}
@@ -136,6 +139,83 @@ async function rollbackPrompt() {
   const result = await API.post('/feedback/rollback', {});
   toast(result.ok ? '롤백 완료!' : (result.error || '롤백 실패'), result.ok ? 'success' : 'error');
   if (typeof loadPromptHistory === 'function') loadPromptHistory();
+}
+
+function renderGenStatus(sched) {
+  if (!sched.enabled) return '';
+  const pad = n => String(n).padStart(2,'0');
+  const fmtAbs = t => {
+    if (!t) return '';
+    const d = new Date(t + 'Z');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+  const fmtRel = t => {
+    if (!t) return '';
+    const diff = Math.floor((Date.now() - new Date(t + 'Z')) / 60000);
+    if (diff < 1) return '방금 전';
+    if (diff < 60) return `${diff}분 전`;
+    if (diff < 1440) return `${Math.floor(diff/60)}시간 전`;
+    return fmtAbs(t);
+  };
+  const fmtFuture = ms => {
+    if (ms <= 0) return '곧 시작';
+    const m = Math.floor(ms / 60000);
+    if (m < 60) return `${m}분 후`;
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
+  };
+
+  let html = '';
+
+  // ── 상단: 현재 상태 (생성 중 or 다음 생성예정) ──
+  html += '<div class="gen-primary">';
+  if (sched.running_project) {
+    html += `<span class="gen-dot running"></span>
+      <span class="gen-primary-text">생성 중 : ${sched.running_project.title}</span>`;
+  } else if (sched.last_created_at) {
+    const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
+    const remaining = nextMs - Date.now();
+    const nextAbs = fmtAbs(new Date(nextMs).toISOString().replace('Z',''));
+    html += `<span class="gen-dot pending"></span>
+      <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)} <span class="gen-abs-time">(${nextAbs})</span></span>`;
+  } else {
+    html += `<span class="gen-dot pending"></span>
+      <span class="gen-primary-text">대기 중</span>`;
+  }
+  html += '</div>';
+
+  // ── 하단: 이력 3열 ──
+  const hasHistory = sched.last_created_at || sched.last_success_at || sched.last_failure_at;
+  if (hasHistory) {
+    html += '<div class="gen-history">';
+    if (sched.last_created_at) {
+      html += `<div class="gen-hist-item">
+        <div class="gen-hist-label">마지막 생성</div>
+        <div class="gen-hist-time">${fmtRel(sched.last_created_at)}</div>
+        <div class="gen-hist-abs">${fmtAbs(sched.last_created_at)}</div>
+      </div>`;
+    }
+    if (sched.last_success_at) {
+      html += `<div class="gen-hist-item">
+        <div class="gen-hist-label">마지막 완성</div>
+        <div class="gen-hist-time">${fmtRel(sched.last_success_at)}</div>
+        <div class="gen-hist-abs">${fmtAbs(sched.last_success_at)}</div>
+      </div>`;
+    }
+    if (sched.last_failure_at) {
+      const reason = sched.last_failure_reason || '';
+      html += `<div class="gen-hist-item failure">
+        <div class="gen-hist-label">마지막 실패</div>
+        <div class="gen-hist-time">${fmtRel(sched.last_failure_at)}</div>
+        <div class="gen-hist-abs">${fmtAbs(sched.last_failure_at)}</div>
+        ${reason ? `<div class="gen-reason">사유 : ${reason}</div>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  return html;
 }
 
 async function testKey(api) {

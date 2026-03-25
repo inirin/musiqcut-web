@@ -857,3 +857,37 @@ pre {
 /* 자동 높이 textarea */
 .auto-resize { resize: none; overflow: hidden; min-height: 32px; max-height: 120px; }
 .lightbox-fb-input::placeholder { color: rgba(255,255,255,0.4); }
+
+/* 자동 생성 상태 표시 */
+.gen-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.gen-dot.success { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.gen-dot.failure { background: var(--error); box-shadow: 0 0 6px var(--error); }
+.gen-dot.running { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: gen-pulse 1.5s ease-in-out infinite; }
+.gen-dot.pending { background: var(--text-muted); opacity: 0.5; }
+@keyframes gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* 상단: 현재 상태 */
+.gen-primary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-top: 10px;
+  background: var(--surface2); border-radius: var(--radius-sm);
+}
+.gen-primary-text { font-size: var(--text-sm); font-weight: 500; }
+
+/* 하단: 이력 3열 */
+.gen-history {
+  display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+}
+.gen-hist-item {
+  flex: 1; min-width: 130px;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.gen-hist-item.failure { border-color: color-mix(in srgb, var(--error) 30%, transparent); }
+.gen-hist-label { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 2px; font-weight: 600; letter-spacing: 0.3px; }
+.gen-hist-time { font-size: var(--text-sm); font-weight: 500; }
+.gen-hist-abs { font-size: var(--text-xs); color: var(--text-muted); opacity: 0.6; }
+.gen-reason { font-size: var(--text-xs); color: var(--text-muted); margin-top: 3px; line-height: 1.3; opacity: 0.7; font-style: italic; }
+.gen-abs-time { font-weight: 400; color: var(--text-muted); font-size: var(--text-xs); }

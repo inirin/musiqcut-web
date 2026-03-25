@@ -10,23 +10,24 @@ from PIL import Image
 from backend.utils.file_manager import image_path
 from backend.utils.gemini_client import gemini_generate_images, get_api_keys
 
-ECHO_WIDTH = 512
-ECHO_HEIGHT = 768
+TARGET_WIDTH = 576
+TARGET_HEIGHT = 1024
 
 
-def _letterbox_to_echo(img_bytes: bytes) -> bytes:
-    """3:4 이미지를 512×768(2:3)에 레터박스(상하 패딩)로 맞춤."""
+def _resize_to_target(img_bytes: bytes) -> bytes:
+    """Imagen 출력을 576×1024 (9:16)으로 리사이즈+크롭."""
     img = Image.open(BytesIO(img_bytes))
-    ratio = ECHO_WIDTH / img.width
+    # 너비 기준 리사이즈 후 높이 크롭/패딩
+    ratio = TARGET_WIDTH / img.width
     new_h = int(img.height * ratio)
-    img = img.resize((ECHO_WIDTH, new_h), Image.LANCZOS)
+    img = img.resize((TARGET_WIDTH, new_h), Image.LANCZOS)
 
-    if new_h >= ECHO_HEIGHT:
-        top = (new_h - ECHO_HEIGHT) // 2
-        img = img.crop((0, top, ECHO_WIDTH, top + ECHO_HEIGHT))
+    if new_h >= TARGET_HEIGHT:
+        top = (new_h - TARGET_HEIGHT) // 2
+        img = img.crop((0, top, TARGET_WIDTH, top + TARGET_HEIGHT))
     else:
-        canvas = Image.new("RGB", (ECHO_WIDTH, ECHO_HEIGHT), (0, 0, 0))
-        paste_y = (ECHO_HEIGHT - new_h) // 2
+        canvas = Image.new("RGB", (TARGET_WIDTH, TARGET_HEIGHT), (0, 0, 0))
+        paste_y = (TARGET_HEIGHT - new_h) // 2
         canvas.paste(img, (0, paste_y))
         img = canvas
 
@@ -64,7 +65,7 @@ async def generate_images(
               f"'{prompt[:80]}'", file=sys.stderr)
 
         img_data = await gemini_generate_images(prompt)
-        img_data = await asyncio.to_thread(_letterbox_to_echo, img_data)
+        img_data = await asyncio.to_thread(_resize_to_target, img_data)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(img_data)
         print(f"[STEP3] 장면 {scene.scene_no} 이미지 생성 완료 ({len(img_data)} bytes)",

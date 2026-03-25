@@ -59,7 +59,7 @@ async def _get_schedule_config(schedule_type: str = "generation") -> dict:
             "SELECT * FROM auto_schedule WHERE schedule_type=?", (schedule_type,))
         if rows:
             return dict(rows[0])
-    return {"schedule_type": schedule_type, "enabled": 0, "interval_hours": 2.0, "last_run_at": None}
+    return {"schedule_type": schedule_type, "enabled": 0, "interval_hours": 2.0}
 
 
 async def save_schedule_config(enabled: bool, interval_hours: float, schedule_type: str = "generation"):
@@ -78,40 +78,109 @@ async def save_schedule_config(enabled: bool, interval_hours: float, schedule_ty
         await db.commit()
 
 
+async def _get_last_auto_created_at() -> str | None:
+    """마지막 자동 생성 작품의 created_at 조회."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        row = await db.execute_fetchall(
+            "SELECT created_at FROM projects WHERE source='auto' "
+            "ORDER BY created_at DESC LIMIT 1")
+        if row:
+            return row[0][0]
+    return None
+
+
+async def _find_interrupted_project() -> dict | None:
+    """서버 재시작으로 중단된 프로젝트 찾기 (가장 최근 1개)."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        rows = await db.execute_fetchall(
+            "SELECT id, theme, mood, length FROM projects "
+            "WHERE status='failed' AND error_msg='서버 재시작으로 중단됨' "
+            "ORDER BY updated_at DESC LIMIT 1")
+        if rows:
+            return dict(rows[0])
+    return None
+
+
 async def _run_auto_generation():
-    """랜덤 테마로 작품 생성."""
+    """중단된 프로젝트 resume 또는 랜덤 테마로 새 작품 생성."""
     from backend.services.pipeline_service import run_pipeline
     from backend.utils.progress import ProgressEmitter, register_emitter
 
-    theme = random.choice(THEME_POOL)
-    mood = random.choice(MOOD_POOL)
-    project_id = str(uuid.uuid4())
+    # 서버 재시작으로 중단된 프로젝트가 있으면 resume
+    interrupted = await _find_interrupted_project()
+    if interrupted:
+        project_id = interrupted["id"]
+        theme = interrupted["theme"]
+        mood = interrupted["mood"]
+        length = interrupted.get("length", "short")
+
+        # 마지막 완료 스텝 다음부터 재시작
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT MAX(step_no) as max_step FROM pipeline_steps "
+                "WHERE project_id=? AND status='done'", (project_id,))
+            result = await cursor.fetchone()
+            resume_from = (result["max_step"] or 0) + 1
+            # 상태 복원
+            await db.execute(
+                "UPDATE projects SET status='pending', error_msg=NULL WHERE id=?",
+                (project_id,))
+            await db.commit()
+
+        emitter = ProgressEmitter(project_id)
+        register_emitter(project_id, emitter)
+        print(f"[Scheduler] 중단된 작품 resume: step {resume_from}부터 (id={project_id[:8]})",
+              file=sys.stderr)
+
+        success = False
+        fail_reason = ""
+        try:
+            await run_pipeline(project_id, theme, mood, emitter,
+                               resume_from=resume_from, length=length)
+            success = True
+        except Exception as e:
+            fail_reason = str(e)[:100]
+            print(f"[Scheduler] resume 실패: {e}", file=sys.stderr)
+    else:
+        # 새 작품 생성
+        theme = random.choice(THEME_POOL)
+        mood = random.choice(MOOD_POOL)
+        project_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO projects (id, theme, mood, length, status, source, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (project_id, theme, mood, "short", "pending", "auto", now, now))
+            await db.commit()
+
+        emitter = ProgressEmitter(project_id)
+        register_emitter(project_id, emitter)
+        print(f"[Scheduler] 자동 생성 시작: {theme[:30]}... (id={project_id[:8]})",
+              file=sys.stderr)
+
+        success = False
+        fail_reason = ""
+        try:
+            await run_pipeline(project_id, theme, mood, emitter, length="short")
+            success = True
+        except Exception as e:
+            fail_reason = str(e)[:100]
+            print(f"[Scheduler] 자동 생성 실패: {e}", file=sys.stderr)
+
+    # 결과 기록
     now = datetime.utcnow().isoformat()
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO projects (id, theme, mood, length, status, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (project_id, theme, mood, "short", "pending", now, now))
-        await db.commit()
-
-    emitter = ProgressEmitter(project_id)
-    register_emitter(project_id, emitter)
-
-    print(f"[Scheduler] 자동 생성 시작: {theme[:30]}... (id={project_id[:8]})",
-          file=sys.stderr)
-
-    try:
-        await run_pipeline(project_id, theme, mood, emitter, length="short")
-    except Exception as e:
-        print(f"[Scheduler] 자동 생성 실패: {e}", file=sys.stderr)
-
-    # 마지막 실행 시간 업데이트
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE auto_schedule SET last_run_at=?",
-            (datetime.utcnow().isoformat(),))
-        await db.commit()
+    if success:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE auto_schedule SET last_success_at=? "
+                "WHERE schedule_type='generation'", (now,))
+            await db.commit()
+    else:
+        await _record_failure("파이프라인 오류 발생")
 
 
 async def _run_auto_feedback_process():
@@ -131,9 +200,33 @@ async def _run_auto_feedback_process():
     await process_feedback()
 
 
+async def _record_failure(reason: str = ""):
+    """자동 생성 실패/스킵 시간 기록."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE auto_schedule SET last_failure_at=?, last_failure_reason=? "
+            "WHERE schedule_type='generation'",
+            (datetime.utcnow().isoformat(), reason or None))
+        await db.commit()
+    if reason:
+        print(f"[Scheduler] 실패 기록: {reason}", file=sys.stderr)
+
+
+_STARTUP_GRACE_SEC = 60  # 서버 시작 후 1분간 자동 생성 보류 (재시작 시 즉시 생성 방지)
+
+
 async def _generation_loop():
     """작품 자동 생성 루프."""
     global _gen_enabled
+    # 중단된 작품이 있으면 즉시 resume (grace period 없이)
+    interrupted = await _find_interrupted_project()
+    if interrupted:
+        print(f"[Scheduler] 중단된 작품 발견, 즉시 resume (id={interrupted['id'][:8]})",
+              file=sys.stderr)
+        await _run_auto_generation()
+    else:
+        print(f"[Scheduler] 서버 시작 대기 ({_STARTUP_GRACE_SEC}초)...", file=sys.stderr)
+        await asyncio.sleep(_STARTUP_GRACE_SEC)
     while _gen_enabled:
         config = await _get_schedule_config("generation")
         if not config.get("enabled"):
@@ -141,16 +234,15 @@ async def _generation_loop():
             break
         interval = config.get("interval_hours", 2.0) * 3600
 
-        # 마지막 실행 이후 간격 미충족 시 남은 시간만 대기
-        last_run = config.get("last_run_at")
-        if last_run:
-            from datetime import datetime, timezone
+        # 마지막 자동 생성 이후 간격 미충족 시 남은 시간만 대기
+        last_created = await _get_last_auto_created_at()
+        if last_created:
             try:
-                last_dt = datetime.fromisoformat(last_run).replace(tzinfo=timezone.utc)
+                last_dt = datetime.fromisoformat(last_created).replace(tzinfo=timezone.utc)
                 elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
                 remaining = interval - elapsed
                 if remaining > 0:
-                    print(f"[Scheduler] 최근 실행 {elapsed/60:.0f}분 전 → {remaining/60:.0f}분 후 생성",
+                    print(f"[Scheduler] 최근 생성 {elapsed/60:.0f}분 전 → {remaining/60:.0f}분 후 생성",
                           file=sys.stderr)
                     await asyncio.sleep(remaining)
                     continue
@@ -159,18 +251,10 @@ async def _generation_loop():
 
         from backend.routers.pipeline import _pipeline_lock
         if _pipeline_lock.locked():
+            print("[Scheduler] 파이프라인 실행 중, 60초 후 재시도", file=sys.stderr)
+            await _record_failure("다른 작품 생성 중")
             await asyncio.sleep(60)
             continue
-
-        # DB에 running 프로젝트가 있으면 스킵 (서버 재시작 후 lock 초기화 대비)
-        async with aiosqlite.connect(DB_PATH) as db:
-            rows = await db.execute_fetchall(
-                "SELECT id FROM projects WHERE status='running' LIMIT 1")
-            if rows:
-                print(f"[Scheduler] DB에 running 프로젝트 존재 ({rows[0][0][:8]}...), 스킵",
-                      file=sys.stderr)
-                await asyncio.sleep(60)
-                continue
 
         try:
             await _run_auto_generation()
@@ -191,9 +275,8 @@ async def _feedback_loop():
             break
         interval = config.get("interval_hours", 12.0) * 3600
 
-        last_run = config.get("last_run_at")
+        last_run = config.get("last_success_at")
         if last_run:
-            from datetime import datetime, timezone
             try:
                 last_dt = datetime.fromisoformat(last_run).replace(tzinfo=timezone.utc)
                 elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()

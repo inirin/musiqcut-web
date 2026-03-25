@@ -57,6 +57,24 @@ async def get_all_schedules():
     from backend.services.scheduler_service import _get_schedule_config
     gen = await _get_schedule_config("generation")
     fb = await _get_schedule_config("feedback")
+    # 현재 생성 중인 작품 + 마지막 생성 작품 시간
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # 생성 중
+        row = await db.execute_fetchall(
+            "SELECT id, title, theme FROM projects "
+            "WHERE status='running' ORDER BY updated_at DESC LIMIT 1")
+        if row:
+            r = row[0]
+            gen["running_project"] = {
+                "id": r["id"],
+                "title": r["title"] or r["theme"][:30],
+            }
+        # 마지막 자동 생성된 작품의 생성 시점
+        row = await db.execute_fetchall(
+            "SELECT created_at FROM projects WHERE source='auto' ORDER BY created_at DESC LIMIT 1")
+        if row:
+            gen["last_created_at"] = row[0]["created_at"]
     return {"generation": gen, "feedback": fb}
 
 

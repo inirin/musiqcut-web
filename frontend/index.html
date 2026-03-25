@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
   <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
-  <link rel="stylesheet" href="/css/style.css?v=1774242796">
+  <link rel="stylesheet" href="/css/style.css?v=1774409200">
 </head>
 <body>
 <div class="app">
@@ -144,7 +144,7 @@
           <div class="step" id="step-3">
             <div class="step-icon">🖼️</div>
             <div class="step-body">
-              <div class="step-name">STEP 3 — 장면 구성 + 이미지 생성 (Gemini + Imagen)</div>
+              <div class="step-name">STEP 3 — 이미지 생성 (Imagen)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
               <div id="image-previews" class="scene-previews mt-4"></div>
@@ -156,7 +156,7 @@
           <div class="step" id="step-4">
             <div class="step-icon">🎞️</div>
             <div class="step-body">
-              <div class="step-name">STEP 4 — 영상 클립 생성 (Wan 2.2 + 보컬 주체 싱크)</div>
+              <div class="step-name">STEP 4 — 영상 클립 생성 (Wan 2.2 S2V + I2V)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
               <div id="clip-previews" class="scene-previews mt-4"></div>
@@ -214,45 +214,45 @@
           <div class="guide-api">Suno AI v3.5 · 외부 API</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 1의 스토리/컨셉 + 작곡 지시</div>
-            <div class="guide-io-out"><span>출력</span> MP3 음원 + Whisper 가사 추출 + 5초 단위 세그먼트 → 장면 수 자동 결정</div>
+            <div class="guide-io-out"><span>출력</span> MP3 음원 + 단어별 정밀 타이밍 + 5초 단위 세그먼트 → 장면 수 자동 결정</div>
           </div>
           <p class="guide-text">
             Suno v3.5가 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초 fade-out.
-            Demucs 보컬 분리 → Whisper large-v3가 실제 가사 + 단어별 타이밍 추출 → Gemini Flash가 오타 보정.
+            Demucs 보컬 분리 → Whisper large-v3 전사 + whisperx forced alignment(wav2vec2)로 단어별 정밀 타이밍 추출 → Gemini Flash가 오타 보정.
             5초 고정 세그먼트로 장면 수 결정.
           </p>
         </div>
         <div class="card">
-          <div class="card-title">🖼️ STEP 3 — 장면 구성 + 이미지 생성</div>
-          <div class="guide-api">Gemini 2.5 Flash + Imagen 4 · Google Cloud API</div>
+          <div class="card-title">🖼️ STEP 3 — 이미지 생성</div>
+          <div class="guide-api">Gemini 2.5 Flash (장면 구성) + Imagen 4 (T2I) · Google Cloud API</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 1의 스토리 + STEP 2에서 결정된 장면 수</div>
-            <div class="guide-io-out"><span>출력</span> 장면별 설명/프롬프트 + PNG 이미지 (512×768 세로)</div>
+            <div class="guide-io-out"><span>출력</span> 장면별 설명/프롬프트 + PNG 이미지 (576×1024 세로 9:16)</div>
           </div>
           <p class="guide-text">
             Whisper 가사 싱크 타이밍 + 캐릭터 프로필을 기반으로 장면을 구성합니다.
-            STEP 1에서 결정된 아트 스타일이 모든 장면에 일관 적용되며, 캐릭터 외형이 매 장면의 이미지 프롬프트에 포함됩니다.
+            STEP 1에서 결정된 아트 스타일이 모든 장면에 일관 적용됩니다.
           </p>
         </div>
         <div class="card">
           <div class="card-title">🎞️ STEP 4 — 영상 클립 생성</div>
-          <div class="guide-api">Wan 2.2 I2V + EchoMimicV3 Flash · ComfyUI · 로컬 GPU</div>
+          <div class="guide-api">Wan 2.2 S2V (립싱크) + Wan 2.2 I2V (모션) · ComfyUI · 로컬 GPU</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 3의 이미지 + 장면 설명 + 보컬 오디오</div>
-            <div class="guide-io-out"><span>출력</span> 장면별 MP4 영상 클립 (512×768 세로, ~5초)</div>
+            <div class="guide-io-out"><span>출력</span> 장면별 MP4 영상 클립 (576×1024 9:16, ~5초)</div>
           </div>
           <p class="guide-text">
             Whisper 보컬 타이밍 + 보컬 주체 여부(is_vocalist) + 샷 타입으로 엔진 자동 분기.
-            보컬 주체의 클로즈업/미디엄은 립싱크, 나머지는 모션 영상.
+            보컬 주체의 클로즈업/미디엄은 Wav2Vec2 기반 립싱크, 나머지는 모션 영상.
           </p>
           <div class="guide-detail">
             <div class="guide-detail-title">엔진 분기</div>
-            보컬 주체 + 클로즈업/미디엄 → EchoMimicV3 Flash (보컬 싱크)<br>
-            와이드/비보컬/비주체 → Wan 2.2 I2V (환경 모션, 캐릭터 등장 억제)
+            보컬 주체 + 클로즈업/미디엄 → Wan 2.2 S2V (Wav2Vec2 오디오 립싱크, ~17분/클립)<br>
+            와이드/비보컬/비주체 → Wan 2.2 I2V (환경 모션, Lightning LoRA 고속)
           </div>
           <div class="guide-detail">
             <div class="guide-detail-title">폴백 전략</div>
-            EchoMimic 실패 → Wan I2V 폴백 · Wan 실패 → 정지 이미지 영상
+            S2V 실패 → 정지 이미지 영상 · Wan I2V 실패 → 정지 이미지 영상
           </div>
         </div>
         <div class="card">
@@ -263,7 +263,8 @@
             <div class="guide-io-out"><span>출력</span> 최종 MP4 뮤직비디오</div>
           </div>
           <p class="guide-text">
-            클립 연결 (FPS 통일) → Suno 음악 오버레이 → faststart 최적화
+            클립 해상도 정규화 (736×1280) + 장면 duration 정밀 trim + FPS 통일 (24fps) → 노래방 스타일 2줄 교대 자막(SRT) 합성 → Suno 음악 오버레이 → faststart 최적화.
+            자막은 단어별로 채워지며, 한 줄 3단어 가득 차면 다른 줄로 교대. 무음 구간에서 오래된 줄 자동 제거.
           </p>
         </div>
       </div>
@@ -276,7 +277,7 @@
           <li>이전 스텝부터 재시도하면 이후 스텝은 자동으로 새로 생성됩니다</li>
           <li>장면 수/곡 길이는 STEP 2 이후 자동 결정되며, DB에 별도 저장하지 않습니다</li>
           <li>STEP 4 진행 중 리소스 모니터로 GPU 활용 상태를 확인할 수 있습니다</li>
-          <li>STEP 4에서 클로즈업/미디엄 장면은 EchoMimicV3 Flash로 자동 보컬 싱크 적용 (Demucs 보컬 분리 → 오디오 드리븐)</li>
+          <li>STEP 4에서 보컬 클로즈업/미디엄 장면은 Wan 2.2 S2V로 Wav2Vec2 립싱크 적용 (Demucs 보컬 분리 → 16kHz mono 변환)</li>
           <li>설정 페이지에서 API 키 연결 상태를 확인하세요</li>
         </ul>
       </div>
@@ -419,7 +420,7 @@
           <label>생성 간격 (시간)</label>
           <input type="number" id="schedule-gen-interval" value="2" min="0.5" max="24" step="0.5" style="width:80px">
         </div>
-        <span id="schedule-gen-status" class="text-muted" style="font-size:var(--text-sm)"></span>
+        <div id="schedule-gen-status"></div>
       </div>
 
     </div>
@@ -483,7 +484,7 @@
 <script src="/js/dashboard.js?v=1774268702"></script>
 <script src="/js/pipeline.js?v=1774268702"></script>
 <script src="/js/feedback.js?v=1774268702"></script>
-<script src="/js/settings.js?v=1774242796"></script>
+<script src="/js/settings.js?v=1774409900"></script>
 
 </body>
 </html>

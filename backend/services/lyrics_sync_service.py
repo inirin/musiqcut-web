@@ -45,11 +45,26 @@ async def extract_lyrics_timestamps(
         total_duration = await measure_audio_duration(audio_path)
 
     clip_sec = TARGET_SCENE_SEC
-    n_clips = max(1, math.ceil(total_duration / clip_sec))
+
+    # 보컬 시작점 감지 — 인트로 무음 구간 최소화
+    vocal_start = 0.0
+    if all_words:
+        first_word_start = all_words[0]["start"]
+        # 첫 보컬이 clip_sec 이후에 시작하면, 보컬 직전부터 세그먼트 시작
+        if first_word_start >= clip_sec:
+            # 보컬 1초 전부터 시작 (최소 0)
+            vocal_start = max(0.0, first_word_start - 1.0)
+            # clip_sec 단위로 정렬
+            vocal_start = round(math.floor(vocal_start / clip_sec) * clip_sec, 2)
+            print(f"[LyricsSync] 인트로 스킵: 보컬 시작 {first_word_start:.1f}초 → "
+                  f"세그먼트 시작 {vocal_start:.1f}초", file=sys.stderr)
+
+    effective_duration = total_duration - vocal_start
+    n_clips = max(1, math.ceil(effective_duration / clip_sec))
     segments = []
     for i in range(n_clips):
-        s = round(i * clip_sec, 2)
-        e = round(min((i + 1) * clip_sec, total_duration), 2)
+        s = round(vocal_start + i * clip_sec, 2)
+        e = round(min(vocal_start + (i + 1) * clip_sec, total_duration), 2)
         # 단어의 중간점이 이 세그먼트에 속하면 포함 (더 많이 겹친 쪽으로)
         words_in = [w for w in all_words
                     if s <= (w["start"] + w["end"]) / 2 < e]
@@ -63,31 +78,113 @@ async def extract_lyrics_timestamps(
         })
 
     vocal_count = sum(1 for sg in segments if sg["has_vocal"])
-    print(f"[LyricsSync] {n_clips}개 세그먼트 (보컬 {vocal_count}개)", file=sys.stderr)
+    print(f"[LyricsSync] {n_clips}개 세그먼트 (보컬 {vocal_count}개, "
+          f"시작 {vocal_start:.1f}초)", file=sys.stderr)
     return segments
 
 
-def _transcribe_vocals(vocals_path: str) -> list[dict]:
-    """faster-whisper로 보컬 트랙 전사."""
-    from faster_whisper import WhisperModel
+def _validate_alignment(wx_words: list, raw_words: list) -> bool:
+    """whisperx 결과 최소 검증: words 비어있음 + 순서 역전만 체크."""
+    if not wx_words:
+        return False
+    for i in range(len(wx_words) - 1):
+        if wx_words[i+1]["start"] < wx_words[i]["start"]:
+            return False
+    return True
 
+
+def _transcribe_vocals(vocals_path: str) -> list[dict]:
+    """faster-whisper 전사 + whisperx forced alignment로 정밀 단어 타임스탬프."""
+    import sys
+
+    # 1) faster-whisper로 텍스트 + 대략적 세그먼트 추출
+    from faster_whisper import WhisperModel
     model = WhisperModel("large-v3", device="cpu", compute_type="int8")
     segments, info = model.transcribe(
         vocals_path,
         language="ko",
         word_timestamps=True,
-        vad_filter=False,  # 노래는 VAD가 보컬을 무음으로 오판 → 끄기
+        vad_filter=False,
     )
-
-    # 세그먼트 + 단어 타임스탬프 반환 (장면별 배분은 pipeline_service에서)
-    result = []
+    raw_segments = []
     for seg in segments:
         entry = {"text": seg.text.strip(), "start": seg.start, "end": seg.end}
         if seg.words:
             entry["words"] = [{"text": w.word.strip(), "start": w.start, "end": w.end}
                               for w in seg.words if w.word.strip()]
-        result.append(entry)
-    return result
+        raw_segments.append(entry)
+
+    # 2) whisperx forced alignment으로 단어 타임스탬프 보정
+    try:
+        import whisperx
+        import torch
+
+        # align 모델은 CPU 사용 (CUDA는 ComfyUI가 점유, cuDNN 호환성 이슈 방지)
+        device = "cpu"
+        audio = whisperx.load_audio(vocals_path)
+
+        # whisperx align 입력 형식으로 변환
+        align_segments = [{"text": s["text"], "start": s["start"], "end": s["end"]}
+                          for s in raw_segments if s["text"].strip()]
+
+        if align_segments:
+            align_model, align_metadata = whisperx.load_align_model(
+                language_code="ko", device=device)
+            aligned = whisperx.align(
+                align_segments, align_model, align_metadata,
+                audio, device, return_char_alignments=False)
+
+            # 정렬된 결과를 세그먼트별로 검증 + fallback
+            aligned_segs = aligned.get("segments", [])
+
+            # align 모델 메모리 해제
+            del align_model
+
+            # raw_segments와 1:1 매칭 (Whisper 결과를 fallback용으로 보존)
+            raw_by_text = {}
+            for rs in raw_segments:
+                if rs["text"].strip():
+                    raw_by_text[rs["text"].strip()] = rs
+
+            result = []
+            for aseg in aligned_segs:
+                text = aseg.get("text", "").strip()
+                entry = {"text": text,
+                         "start": aseg.get("start", 0),
+                         "end": aseg.get("end", 0)}
+                words = aseg.get("words", [])
+                wx_words = [{"text": w.get("word", "").strip(),
+                             "start": w.get("start", 0),
+                             "end": w.get("end", 0)}
+                            for w in words if w.get("word", "").strip()
+                            and "start" in w and "end" in w]
+
+                raw = raw_by_text.get(text)
+                raw_words = raw.get("words", []) if raw else []
+
+                # 검증: Whisper vs whisperx 단어별 비교
+                use_whisperx = _validate_alignment(wx_words, raw_words)
+
+                if use_whisperx:
+                    entry["words"] = wx_words
+                elif raw_words:
+                    entry["words"] = raw_words
+                    print(f"[LyricsSync] whisperx 검증 실패 → Whisper fallback: "
+                          f"'{text[:20]}...'", file=sys.stderr)
+                else:
+                    entry["words"] = wx_words  # 둘 다 없으면 그냥 사용
+
+                result.append(entry)
+
+            print(f"[LyricsSync] whisperx forced alignment 완료 ({len(result)}개 세그먼트)",
+                  file=sys.stderr)
+            return result
+
+    except Exception as e:
+        print(f"[LyricsSync] whisperx alignment 실패, faster-whisper 결과 사용: {e}",
+              file=sys.stderr)
+
+    return raw_segments
 
 
 def _align_lyrics_to_segments(
