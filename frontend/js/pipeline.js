@@ -342,18 +342,16 @@ function _addRetryButton(stepEl, step) {
   const id = window._currentProjectId;
 
   if (step === 3 || step === 4) {
-    // 이어서 재시도 (기존 결과 유지)
     const btnResume = document.createElement('button');
     btnResume.className = 'btn btn-primary btn-sm';
     btnResume.textContent = `▶ 이어서 생성`;
-    btnResume.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${step}을 이어서 생성하시겠습니까?`)) retryFromStep(id, step); };
+    btnResume.onclick = (e) => { e.stopPropagation(); if (confirm(`이어서 생성하시겠습니까?`)) retryFromStep(id, step); };
     wrap.appendChild(btnResume);
-    // 처음부터 재시도 (이전 스텝부터 리셋)
-    const resetStep = step === 3 ? 3 : 3; // Step 4도 Step 3부터 리셋 (이미지→클립 연동)
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-secondary btn-sm';
-    btnReset.textContent = `↺ 처음부터 재생성`;
-    btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${resetStep}부터 모두 재생성하시겠습니까? 기존 결과가 삭제됩니다.`)) retryFromStep(id, resetStep); };
+    btnReset.textContent = step === 4 ? `↺ 이미지부터 재생성` : `↺ 처음부터 재생성`;
+    const resetStep = 3;
+    btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP 3부터 모두 재생성하시겠습니까? 기존 이미지와 클립이 삭제됩니다.`)) retryFromStep(id, resetStep); };
     wrap.appendChild(btnReset);
   } else {
     const btn = document.createElement('button');
