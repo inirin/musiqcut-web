@@ -11,11 +11,11 @@ import random
 
 def _get_short_guide():
     """숏폼 하이라이트 — 15~30초."""
-    lines = random.choice(["2~4줄", "3~4줄"])
+    lines = random.choice(["2~3줄", "3줄"])
     return {
         "lyrics_lines": lines,
         "duration": "15초 내외 (최대 30초, 짧을수록 좋음)",
-        "structure": "가사 2~4줄 작성. 반복/간주 넣지 말 것. 인트로 없이 바로 시작, 짧게 끝내기. 가사 끝에 [End] 태그 필수.",
+        "structure": "가사 2~3줄 작성. 반복/간주 넣지 말 것. 인트로 없이 바로 시작, 짧게 끝내기. 가사 끝에 [End] 태그 필수.",
         "suno_hint": "very short 15 second jingle, immediate vocal, no repeats, no instrumental break, ends abruptly after vocals",
         "lyrics_suffix": "\n[End]",
     }
