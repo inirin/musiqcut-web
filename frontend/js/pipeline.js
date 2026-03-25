@@ -231,8 +231,8 @@ function resetProgressUI(fromStep = 1) {
   if (fromStep <= 1) {
     const lyricsEl = document.getElementById('step-1-lyrics');
     if (lyricsEl) { lyricsEl.textContent = ''; lyricsEl.classList.add('hidden'); }
-    const metaEl = document.getElementById('project-cast');
-    if (metaEl) { metaEl.innerHTML = ''; metaEl.style.display = 'none'; }
+    const metaEl = document.getElementById('step-1-meta');
+    if (metaEl) { metaEl.innerHTML = ''; metaEl.classList.add('hidden'); }
   }
   if (fromStep <= 2) {
     const audioEl = document.getElementById('step-2-audio');
@@ -279,10 +279,10 @@ function updateStepUI(step, status, message, data) {
       document.getElementById('result-art-style').textContent = data.art_style;
     }
     // 보컬리스트 + 등장인물
-    const metaEl = document.getElementById('project-cast');
+    const metaEl = document.getElementById('step-1-meta');
     if (metaEl && (data.vocal_style || data.characters?.length)) {
       metaEl.innerHTML = renderStep1Meta(data);
-      metaEl.style.display = '';
+      metaEl.classList.remove('hidden');
     }
   }
   // STEP 2: 오디오 (running/done 모두)

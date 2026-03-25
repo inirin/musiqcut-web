@@ -57,15 +57,19 @@ async function loadResult() {
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
   document.getElementById('result-theme').textContent = project.theme;
-  // 트렌드 영감 (mood에서 [트렌드 힌트: ...] 파싱)
-  const inspiredWrap = document.getElementById('result-inspired-wrap');
-  const inspiredEl = document.getElementById('result-inspired');
+  // 트렌드 영감 — 작품 정보 카드 하단에 INSPIRED BY 배지로 표시
+  const castEl = document.getElementById('project-cast');
   const hintMatch = (project.mood || '').match(/\[트렌드 힌트:\s*(.+?)\]$/);
-  if (hintMatch && inspiredWrap && inspiredEl) {
-    inspiredEl.textContent = hintMatch[1].trim();
-    inspiredWrap.style.display = '';
-  } else if (inspiredWrap) {
-    inspiredWrap.style.display = 'none';
+  if (hintMatch && castEl) {
+    const hint = hintMatch[1].trim();
+    castEl.innerHTML = `<div class="step1-section inspired">
+      <div class="step1-section-header"><span class="step1-badge inspired">INSPIRED BY</span></div>
+      <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${hint}</div>
+    </div>`;
+    castEl.style.display = '';
+  } else if (castEl) {
+    castEl.innerHTML = '';
+    castEl.style.display = 'none';
   }
   // art_style은 lyrics.json에서 로드 (아래 step1 블록에서 처리)
   document.getElementById('result-art-style').textContent = '';
@@ -122,11 +126,11 @@ async function loadResult() {
           if (artEl && !artEl.textContent && lyricsData.art_style) {
             artEl.textContent = lyricsData.art_style;
           }
-          // 캐릭터/보컬 — 작품 정보 카드에 표시
-          const castEl = document.getElementById('project-cast');
-          if (castEl && !castEl.innerHTML.trim()) {
+          // 캐릭터/보컬 — Step 1에 표시
+          const metaEl = document.getElementById('step-1-meta');
+          if (metaEl && !metaEl.innerHTML.trim()) {
             const html = renderStep1Meta(lyricsData);
-            if (html) { castEl.innerHTML = html; castEl.style.display = ''; }
+            if (html) { metaEl.innerHTML = html; metaEl.classList.remove('hidden'); }
           }
         } catch {}
       }

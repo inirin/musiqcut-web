@@ -92,9 +92,6 @@
           <div class="info-item">
             <span class="info-label">테마</span><span id="result-theme" class="info-value"></span>
           </div>
-          <div class="info-item" id="result-inspired-wrap" style="display:none">
-            <span class="info-label">영감</span><span id="result-inspired" class="info-value step1-collapse" onclick="this.classList.toggle('open')"></span>
-          </div>
           <div class="info-item">
             <span class="info-label">아트 스타일</span><span id="result-art-style" class="info-value"></span>
           </div>
@@ -109,6 +106,7 @@
       </div>
 
       <!-- 파이프라인 (실시간 진행 + 과거 결과 통합) -->
+
       <div class="card">
         <div class="card-title">파이프라인</div>
         <div class="steps">
@@ -119,6 +117,7 @@
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
               <pre id="step-1-lyrics" class="hidden step-prompt step-content-block"></pre>
+              <div id="step-1-meta" class="hidden step-content-block"></div>
               <div class="step-feedback hidden" data-step="1">
                 <div class="step-fb-list"></div>
                 <form class="flex gap-2 step-fb-form" data-step="1">
