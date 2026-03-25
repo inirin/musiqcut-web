@@ -91,9 +91,11 @@ def _fetch_google_trends() -> list[str]:
 
 
 async def _generate_random_theme() -> tuple[str, str]:
-    """Google Trends + Gemini로 트렌드 기반 테마 생성."""
+    """Google Trends + Gemini (Google Search grounding) 기반 테마 생성."""
     try:
-        from backend.utils.gemini_client import gemini_generate
+        from backend.utils.gemini_client import get_api_keys
+        from google import genai
+        from google.genai import types
         import json as _json
 
         # 실시간 트렌드 가져오기
@@ -115,8 +117,8 @@ async def _generate_random_theme() -> tuple[str, str]:
 
         prompt = f"""당신은 뮤지컬 애니메이션 숏폼 콘텐츠 기획자입니다.
 
-STEP 1: 아래 트렌드를 읽고 각 키워드가 **왜 화제인지, 무슨 일이 벌어졌는지** 파악하세요.
-(키워드 옆의 뉴스 제목들을 종합하여 맥락을 이해)
+STEP 1: 아래 트렌드를 읽고 각 키워드가 **왜 화제인지, 무슨 일이 벌어졌는지** Google 검색으로 파악하세요.
+(키워드 옆의 뉴스 제목과 검색 결과를 종합하여 맥락을 이해)
 
 STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상황**을 뮤지컬 애니메이션 테마로 만드세요.
 
@@ -149,9 +151,18 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
 반드시 아래 JSON 형식으로만 응답하세요:
 {{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "선택한 트렌드 키워드"}}"""
 
-        response = await gemini_generate(
+        # Google Search grounding으로 트렌드 맥락 파악 + 테마 생성
+        keys = get_api_keys()
+        if not keys:
+            raise ValueError("Gemini API 키 미설정")
+        client = genai.Client(api_key=keys[0])
+        response = await asyncio.to_thread(
+            client.models.generate_content,
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            )
         )
         text = response.text.strip()
         text = text.replace("```json", "").replace("```", "").strip()
