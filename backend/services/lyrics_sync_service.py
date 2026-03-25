@@ -109,11 +109,8 @@ def _transcribe_vocals(vocals_path: str) -> list[dict]:
     )
     raw_segments = []
     for seg in segments:
-        # 환각 필터링: 비음성 확률 높거나 압축률 비정상이면 스킵
-        if seg.no_speech_prob > 0.7:
-            print(f"[LyricsSync] 환각 스킵 (no_speech={seg.no_speech_prob:.2f}): "
-                  f"'{seg.text.strip()[:30]}'", file=sys.stderr)
-            continue
+        # 환각 필터링: 압축률 비정상이면 스킵 (반복 환각)
+        # no_speech_prob는 노래 보컬에서 오탐이 심해 사용하지 않음
         if seg.compression_ratio > 2.4:
             print(f"[LyricsSync] 환각 스킵 (compress={seg.compression_ratio:.1f}): "
                   f"'{seg.text.strip()[:30]}'", file=sys.stderr)
