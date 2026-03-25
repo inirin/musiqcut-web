@@ -158,8 +158,8 @@ async def generate_music(
         "Content-Type": "application/json"
     }
 
-    # 보컬 강조: Suno가 instrumental로 빠지지 않도록 style에 보컬 강제 힌트 추가
-    style = music_prompt
+    # Suno music_style 500자 제한
+    style = music_prompt[:500] if len(music_prompt) > 500 else music_prompt
     vocal_keywords = ["vocal", "singing", "singer"]
     if not any(kw in style.lower() for kw in vocal_keywords):
         style = f"clear singing vocals, {style}"
