@@ -342,11 +342,14 @@ function _addRetryButton(stepEl, step) {
   const id = window._currentProjectId;
 
   if (step === 3 || step === 4) {
-    const btnResume = document.createElement('button');
-    btnResume.className = 'btn btn-primary btn-sm';
-    btnResume.textContent = `▶ 이어서 생성`;
-    btnResume.onclick = (e) => { e.stopPropagation(); if (confirm(`이어서 생성하시겠습니까?`)) retryFromStep(id, step); };
-    wrap.appendChild(btnResume);
+    // 실패 상태일 때만 이어서 생성 버튼 표시
+    if (stepEl.classList.contains('failed')) {
+      const btnResume = document.createElement('button');
+      btnResume.className = 'btn btn-primary btn-sm';
+      btnResume.textContent = `▶ 이어서 생성`;
+      btnResume.onclick = (e) => { e.stopPropagation(); if (confirm(`이어서 생성하시겠습니까?`)) retryFromStep(id, step); };
+      wrap.appendChild(btnResume);
+    }
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-secondary btn-sm';
     btnReset.textContent = `↺ 처음부터 재생성`;

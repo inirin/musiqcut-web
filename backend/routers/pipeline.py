@@ -83,7 +83,7 @@ async def resume_pipeline_endpoint(project_id: str, from_step: int = 0, reset: b
     # reset=true면 해당 스텝의 캐시 파일 삭제
     if reset and from_step > 0:
         from backend.services.pipeline_service import _clean_step_files
-        await _clean_step_files(project_id, from_step)
+        await _clean_step_files(project_id, from_step, reset=True)
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
