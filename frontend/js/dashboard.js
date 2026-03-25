@@ -122,12 +122,11 @@ async function loadResult() {
           if (artEl && !artEl.textContent && lyricsData.art_style) {
             artEl.textContent = lyricsData.art_style;
           }
-          // 캐릭터/보컬 표시 (pipeline.js의 renderStep1Meta 공용)
-          const metaEl = document.getElementById('step-1-meta');
-          if (metaEl && !metaEl.innerHTML.trim()) {
-            lyricsData.mood = project.mood;  // DB에서 mood 전달 (트렌드 힌트 포함)
+          // 캐릭터/보컬 — 작품 정보 카드에 표시
+          const castEl = document.getElementById('project-cast');
+          if (castEl && !castEl.innerHTML.trim()) {
             const html = renderStep1Meta(lyricsData);
-            if (html) { metaEl.innerHTML = html; metaEl.classList.remove('hidden'); }
+            if (html) { castEl.innerHTML = html; castEl.style.display = ''; }
           }
         } catch {}
       }
