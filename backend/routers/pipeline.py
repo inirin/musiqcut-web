@@ -74,11 +74,16 @@ async def run_pipeline_endpoint(body: PipelineRunRequest):
 
 
 @router.post("/resume/{project_id}")
-async def resume_pipeline_endpoint(project_id: str, from_step: int = 0):
-    """특정 STEP부터 재시도."""
+async def resume_pipeline_endpoint(project_id: str, from_step: int = 0, reset: bool = False):
+    """특정 STEP부터 재시도. reset=true면 해당 스텝 결과물 삭제 후 처음부터."""
     global _running_project_id
     if _pipeline_lock.locked():
         return {"ok": False, "error": "다른 작업이 진행 중입니다. 완료 후 다시 시도해주세요."}
+
+    # reset=true면 해당 스텝의 캐시 파일 삭제
+    if reset and from_step > 0:
+        from backend.services.pipeline_service import _clean_step_files
+        await _clean_step_files(project_id, from_step)
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row

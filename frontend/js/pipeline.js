@@ -349,9 +349,8 @@ function _addRetryButton(stepEl, step) {
     wrap.appendChild(btnResume);
     const btnReset = document.createElement('button');
     btnReset.className = 'btn btn-secondary btn-sm';
-    btnReset.textContent = step === 4 ? `↺ 이미지부터 재생성` : `↺ 처음부터 재생성`;
-    const resetStep = 3;
-    btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP 3부터 모두 재생성하시겠습니까? 기존 이미지와 클립이 삭제됩니다.`)) retryFromStep(id, resetStep); };
+    btnReset.textContent = `↺ 처음부터 재생성`;
+    btnReset.onclick = (e) => { e.stopPropagation(); if (confirm(`STEP ${step}을 처음부터 재생성하시겠습니까?`)) retryFromStep(id, step, true); };
     wrap.appendChild(btnReset);
   } else {
     const btn = document.createElement('button');
@@ -374,7 +373,7 @@ function _addCompletedRetryButtons() {
   }
 }
 
-async function retryFromStep(id, step) {
+async function retryFromStep(id, step, reset = false) {
   _pipelineRunning = true;
   _pipelineProjectId = id;
   window._currentProjectId = id;
@@ -389,7 +388,8 @@ async function retryFromStep(id, step) {
   });
 
   // 1) POST로 재시도 시작
-  const result = await API.post(`/pipeline/resume/${id}?from_step=${step}`, {});
+  const resetParam = reset ? '&reset=true' : '';
+  const result = await API.post(`/pipeline/resume/${id}?from_step=${step}${resetParam}`, {});
   if (!result.ok) {
     toast(result.error || '재시도 실패', 'error');
     _pipelineRunning = false;
