@@ -57,6 +57,16 @@ async function loadResult() {
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
   document.getElementById('result-theme').textContent = project.theme;
+  // 트렌드 영감 (mood에서 [트렌드 힌트: ...] 파싱)
+  const inspiredWrap = document.getElementById('result-inspired-wrap');
+  const inspiredEl = document.getElementById('result-inspired');
+  const hintMatch = (project.mood || '').match(/\[트렌드 힌트:\s*(.+?)\]$/);
+  if (hintMatch && inspiredWrap && inspiredEl) {
+    inspiredEl.textContent = hintMatch[1].trim();
+    inspiredWrap.style.display = '';
+  } else if (inspiredWrap) {
+    inspiredWrap.style.display = 'none';
+  }
   // art_style은 lyrics.json에서 로드 (아래 step1 블록에서 처리)
   document.getElementById('result-art-style').textContent = '';
   // 곡 길이/장면 수: 오디오 파일에서 파생

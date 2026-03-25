@@ -900,8 +900,6 @@ pre {
   border: 1px solid var(--border);
 }
 .step1-section.vocalist { border-left: 3px solid var(--accent); }
-.step1-section.inspired { border-left: 3px solid var(--warning); }
-.step1-badge.inspired { background: var(--warning); color: #000; }
 .step1-section-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .step1-badge {
   font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.5px;
