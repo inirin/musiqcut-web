@@ -60,7 +60,7 @@ def _fetch_google_trends() -> list[str]:
 
     ns = {"ht": "https://trends.google.com/trending/rss"}
     all_trends = []
-    for geo in ["KR", "US", "JP"]:
+    for geo in ["KR"]:
         try:
             url = f"https://trends.google.co.kr/trending/rss?geo={geo}"
             req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
