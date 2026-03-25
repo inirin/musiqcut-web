@@ -79,8 +79,9 @@ async def _generate_random_theme() -> tuple[str, str]:
         from backend.utils.gemini_client import gemini_generate
         import json as _json
 
-        # 실시간 트렌드 가져오기
-        trends = await asyncio.to_thread(_fetch_google_trends)
+        # 실시간 트렌드 가져오기 (랜덤 3개만 선택하여 편중 방지)
+        all_trends = await asyncio.to_thread(_fetch_google_trends)
+        trends = random.sample(all_trends, min(3, len(all_trends))) if all_trends else []
         trends_text = "\n".join(f"- {t}" for t in trends) if trends else "(조회 실패)"
 
         # 기존 작품 테마를 가져와서 중복 방지
@@ -99,7 +100,7 @@ async def _generate_random_theme() -> tuple[str, str]:
 아래 실시간 트렌드 키워드 중 하나를 골라, 그 키워드와 **자연스럽게 연결되는** 작품 테마를 만드세요.
 
 규칙:
-- 트렌드 키워드에서 1개를 선택하고, inspired_by에 어떤 키워드인지 명시
+- 아래 제공된 키워드 중 **반드시 1개를 선택**하고, inspired_by에 명시
 - 키워드와의 연결고리가 누가 봐도 느껴져야 함 (너무 추상적 변환 금지)
 - 키워드 자체를 제목에 넣어도 되고, 관련 인물/사건/감정을 테마로 풀어도 됨
 - 예: "스페이스X" → "화성행 편도 티켓 - 돌아올 수 없는 우주비행사의 마지막 메시지"
