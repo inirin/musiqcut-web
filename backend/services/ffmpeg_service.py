@@ -124,8 +124,10 @@ def _generate_srt(scenes: list, out_path: Path,
 
         events.append((w_start, _display()))
 
-    # 마지막 단어의 종료 시점
-    last_end = all_words[-1].get('end', all_words[-1]['start'] + 1.0)
+    # 마지막 단어의 종료 시점 (최소 표시 시간 보장)
+    last_word = all_words[-1]
+    last_end = max(last_word.get('end', last_word['start'] + 1.0),
+                   last_word['start'] + MIN_LINE_DISPLAY)
 
     # 3) 이벤트 → SRT 변환 (겹침 없이 연결)
     #    빈 텍스트 이벤트 제거 + 시간순 정렬
