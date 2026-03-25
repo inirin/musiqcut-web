@@ -245,7 +245,41 @@ def _count_files(directory: Path, pattern: str) -> int:
     return len(list(directory.glob(pattern)))
 
 
+_MAX_VOCAL_RETRY = 2  # 보컬 감지 실패 시 Step 1부터 재시도 최대 횟수
+
+
 async def run_pipeline(
+    project_id: str,
+    theme: str,
+    mood: str,
+    emitter: ProgressEmitter,
+    resume_from: int = 0,
+    length: str = "short",
+):
+    """파이프라인 실행. 보컬 감지 실패 시 Step 1부터 자동 재시도."""
+    for attempt in range(_MAX_VOCAL_RETRY + 1):
+        try:
+            result = await _run_pipeline_steps(
+                project_id, theme, mood, emitter,
+                resume_from=resume_from, length=length)
+            return result  # 성공
+        except _VocalDetectionError:
+            if attempt >= _MAX_VOCAL_RETRY:
+                raise RuntimeError("보컬 감지 실패 — 재시도 소진")
+            print(f"[Pipeline] 보컬 감지 실패 → Step 1부터 재시도 "
+                  f"({attempt + 1}/{_MAX_VOCAL_RETRY})", file=sys.stderr)
+            await emitter.update(2, "running",
+                f"보컬 감지 실패, Step 1부터 재시도 ({attempt + 1}/{_MAX_VOCAL_RETRY})")
+            await _clean_step_files(project_id, 1)
+            resume_from = 0  # 다음 루프에서 Step 1부터
+
+
+class _VocalDetectionError(Exception):
+    """보컬 감지 실패 — Step 1 재시도 트리거용."""
+    pass
+
+
+async def _run_pipeline_steps(
     project_id: str,
     theme: str,
     mood: str,
@@ -368,23 +402,10 @@ async def run_pipeline(
                     audio_file, lyrics, demucs_dir,
                     total_duration=actual_duration)
 
-                # 보컬 감지 실패 시 Step 1부터 재시도 (새 스토리/가사/음악)
+                # 보컬 감지 실패 → _VocalDetectionError로 상위 루프에서 재시도
                 vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
                 if vocal_count == 0:
-                    _vocal_retry = getattr(emitter, '_vocal_retry', 0)
-                    if _vocal_retry >= 2:
-                        raise RuntimeError("보컬 감지 실패 — 재시도 2회 소진")
-                    emitter._vocal_retry = _vocal_retry + 1
-                    print(f"[STEP2] 보컬 감지 실패 → Step 1부터 재시도 "
-                          f"({emitter._vocal_retry}/2)", file=sys.stderr)
-                    await emitter.update(2, "running",
-                        f"보컬 감지 실패, Step 1부터 재시도 ({emitter._vocal_retry}/2)")
-                    # 기존 파일 전부 삭제
-                    await _clean_step_files(project_id, 1)
-                    # Step 1부터 재귀 실행
-                    return await run_pipeline(
-                        project_id, theme, mood, emitter,
-                        resume_from=0, length=length)
+                    raise _VocalDetectionError()
 
             # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만)
             if not _cached_lyrics:
