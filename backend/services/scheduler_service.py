@@ -149,7 +149,7 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
 {avoid}
 
 반드시 아래 JSON 형식으로만 응답하세요:
-{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "검색으로 파악한 실제 내용 요약 (예: '배우 김효진(40대 여성, 단발머리) - 영화 왕과 사는 남자로 28년만에 천만 관객 달성, 사극 배경, 단종과 엄흥도의 이야기'). 인물이면 성별/나이대/외형 특징/대표작, 사건이면 장소/시기/핵심 상황을 반드시 포함"}}"""
+{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "선택한 트렌드 키워드와 뉴스 헤드라인을 원본 그대로 복사 (예: '블리자드: 블리자드, 와우X오로라 합작 신곡 공개 / WoW X 오로라 만났다…'). 위 트렌드 목록에서 선택한 항목 전체를 그대로 붙여넣기", "inspired_detail": "검색으로 파악한 실제 맥락 요약 — 인물이면 성별/나이대/외형 특징/대표작, 사건이면 장소/시기/핵심 상황 포함"}}"""
 
         # Google Search grounding으로 트렌드 맥락 파악 + 테마 생성
         keys = get_api_keys()
@@ -169,26 +169,16 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
         data = _json.loads(text)
         theme = data.get("theme", "").strip()
         mood = data.get("mood", "auto").strip()
-        inspired = data.get("inspired_by", "").strip()
-        # 원본 트렌드 키워드+헤드라인 찾기 (프론트 표시용)
-        selected_keyword = data.get("inspired_by", "")
-        original_trend = ""
-        for t in trends:
-            # 키워드 매칭 (트렌드 텍스트에 inspired_by의 첫 단어가 포함)
-            keyword_part = t.split(":")[0].strip() if ":" in t else t
-            if keyword_part and keyword_part in selected_keyword:
-                original_trend = t
-                break
-        if not original_trend:
-            original_trend = inspired  # fallback
+        inspired_by = data.get("inspired_by", "").strip()  # 원본 출처 (프론트 표시)
+        inspired_detail = data.get("inspired_detail", "").strip()  # 맥락 요약 (Step 1용)
         if theme:
-            # inspired_by를 mood에 포함 → Step 1에서 캐릭터/보컬/아트 설계에 활용
-            if inspired:
-                mood = f"{mood} [트렌드 힌트: {inspired}]"
-            # 원본 트렌드를 theme에 태그로 포함 (프론트 표시용)
-            if original_trend:
-                theme = f"{theme} [원본출처: {original_trend}]"
-            print(f"[Scheduler] Gemini 테마 생성: {theme[:60]} / {mood[:40]}",
+            # Step 1용: detail을 mood에 포함
+            if inspired_detail:
+                mood = f"{mood} [트렌드 힌트: {inspired_detail}]"
+            # 프론트 표시용: 원본 출처를 theme에 태그
+            if inspired_by:
+                theme = f"{theme} [영감: {inspired_by}]"
+            print(f"[Scheduler] Gemini 테마 생성: {theme[:60]}",
                   file=sys.stderr)
             return theme, mood
     except Exception as e:

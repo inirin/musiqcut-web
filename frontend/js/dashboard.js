@@ -56,9 +56,9 @@ async function loadResult() {
 
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
-  // 테마에서 [원본출처: ...] 태그 분리
+  // 테마에서 [영감: ...] 태그 분리
   let themeText = project.theme || '';
-  const sourceMatch = themeText.match(/\s*\[원본출처:\s*(.+?)\]$/);
+  const sourceMatch = themeText.match(/\s*\[영감:\s*(.+?)\]$/);
   if (sourceMatch) themeText = themeText.replace(sourceMatch[0], '');
   document.getElementById('result-theme').textContent = themeText;
   // 트렌드 영감 — 원본 트렌드 키워드+뉴스 헤드라인 표시 (자동 생성만)
