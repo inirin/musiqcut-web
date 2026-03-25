@@ -131,7 +131,7 @@ SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입
     {{
       "scene_no": 1,
       "shot_type": "closeup 또는 medium 또는 wide (반드시 영문 소문자)",
-      "is_vocalist": true/false (이 장면이 주인공(보컬리스트)의 클로즈업/미디엄인 경우에만 true. 조연/충신/배경인물이면 무조건 false. 와이드샷은 무조건 false. 오직 노래하는 주인공 1인 장면만 true),
+      "is_vocalist": true/false (보컬 구간에서 주인공(첫 번째 캐릭터)이 화면에 등장하는 클로즈업/미디엄이면 무조건 true — 가사 내용과 무관하게 주인공이 보이면 true. 조연만 등장하거나 와이드샷이면 false),
       "description": "장면 설명 (한국어, 샷 타입/캐릭터 동작/감정 포함, 예: '[클로즈업] 주인공이 눈을 감고 미소짓는다')",
       "image_prompt": "vertical portrait composition, [shot_type에 맞는 구도] {art_style}, [상세 영문 프롬프트, 배경/조명/캐릭터 포즈/표정 포함]"
     }}
