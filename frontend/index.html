@@ -193,21 +193,21 @@
           테마/스토리만 입력하면 AI가 분위기, 아트 스타일, 캐릭터, 음악까지 모두 자동으로 결정합니다.
         </p>
         <div class="guide-table">
-          <div class="guide-row"><span class="guide-label">숏폼</span><span>15~30초 · 가사 2~4줄 · 바로 보컬 시작 · 다채로운 구성</span></div>
+          <div class="guide-row"><span class="guide-label">숏폼</span><span>15~30초 · 가사 2~3줄 · 바로 보컬 시작 · 다채로운 구성</span></div>
         </div>
       </div>
 
       <div class="guide-flow">
         <div class="card">
           <div class="card-title">✍️ STEP 1 — 스토리/컨셉 생성</div>
-          <div class="guide-api">Gemini 2.5 Flash · Google Cloud API</div>
+          <div class="guide-api">Gemini 2.5 Flash + Google Search grounding · Google Cloud API</div>
           <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> 테마/스토리</div>
-            <div class="guide-io-out"><span>출력</span> 제목, 스토리/컨셉, 작곡 지시, 아트 스타일, 캐릭터 프로필</div>
+            <div class="guide-io-in"><span>입력</span> 테마 + 분위기 + 트렌드 힌트 (자동 생성 시)</div>
+            <div class="guide-io-out"><span>출력</span> 제목, 가사, 작곡 지시, 보컬 스타일, 아트 스타일, 캐릭터 프로필</div>
           </div>
           <p class="guide-text">
             테마에서 분위기/아트 스타일을 자동 판단하고, 캐릭터 외형 프로필(최대 3명)을 상세 정의합니다.
-            보컬 성별/연령대는 주인공 캐릭터에 맞춰 자동 결정됩니다.
+            트렌드 힌트가 있으면 Google 검색으로 실존 인물/작품을 파악하여 캐릭터 외형·보컬·아트 스타일에 반영합니다 (고유명사는 제목/가사에 사용하지 않음).
           </p>
         </div>
         <div class="card">
@@ -218,9 +218,9 @@
             <div class="guide-io-out"><span>출력</span> MP3 음원 + 단어별 정밀 타이밍 + 5초 단위 세그먼트 → 장면 수 자동 결정</div>
           </div>
           <p class="guide-text">
-            Suno v3.5가 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초 fade-out.
+            Suno v3.5가 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초.
             Demucs 보컬 분리 → Whisper large-v3 전사 + whisperx forced alignment(wav2vec2)로 단어별 정밀 타이밍 추출 → Gemini Flash가 오타 보정.
-            5초 고정 세그먼트로 장면 수 결정.
+            보컬 감지 실패(50% 미만) 시 Step 1부터 새 스토리/가사/음악으로 자동 재시도 (최대 2회).
           </p>
         </div>
         <div class="card">
@@ -264,8 +264,7 @@
             <div class="guide-io-out"><span>출력</span> 최종 MP4 뮤직비디오</div>
           </div>
           <p class="guide-text">
-            클립 해상도 정규화 (736×1280) + 장면 duration 정밀 trim + FPS 통일 (24fps) → 노래방 스타일 2줄 교대 자막(SRT) 합성 → Suno 음악 오버레이 → faststart 최적화.
-            자막은 단어별로 채워지며, 한 줄 3단어 가득 차면 다른 줄로 교대. 무음 구간에서 오래된 줄 자동 제거.
+            클립 해상도 정규화 (736×1280) + 장면 duration 정밀 trim + FPS 통일 (24fps) → 오디오 합성 + 마지막 2초 fade-out → faststart 최적화.
           </p>
         </div>
       </div>
@@ -280,8 +279,9 @@
       <div class="card">
         <div class="card-title">⏰ 자동 생성 스케줄러</div>
         <ul class="guide-notes">
-          <li>설정한 간격(기본 2시간)마다 Gemini가 랜덤 테마를 생성하여 자동으로 작품 제작</li>
-          <li>서버 재시작 시 중단된 작품 자동 resume</li>
+          <li>설정한 간격(기본 2시간)마다 Google Trends 실시간 키워드 기반으로 테마를 생성하여 자동 작품 제작</li>
+          <li>Gemini Google Search grounding으로 트렌드 맥락 파악 → 구체적 상황 기반 테마 생성</li>
+          <li>서버 재시작 시 중단된 작품 자동 resume, 보컬 감지 실패 시 Step 1부터 자동 재시도</li>
           <li>설정 페이지에서 활성화/간격 조정 가능</li>
         </ul>
       </div>
