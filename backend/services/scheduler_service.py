@@ -54,10 +54,11 @@ async def _get_last_auto_created_at() -> str | None:
 
 
 def _fetch_google_trends() -> list[str]:
-    """Google Trends RSS에서 다국가 실시간 트렌드 키워드를 가져옴."""
+    """Google Trends RSS에서 다국가 트렌드 키워드 + 뉴스 맥락을 가져옴."""
     import urllib.request as _ur
     import xml.etree.ElementTree as _ET
 
+    ns = {"ht": "https://trends.google.com/trending/rss"}
     all_trends = []
     for geo in ["KR", "US", "JP"]:
         try:
@@ -65,13 +66,26 @@ def _fetch_google_trends() -> list[str]:
             req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = _ur.urlopen(req, timeout=10)
             root = _ET.fromstring(resp.read())
-            items = root.findall(".//item")
-            trends = [item.find("title").text for item in items[:5] if item.find("title") is not None]
-            all_trends.extend(trends)
+            for item in root.findall(".//item")[:5]:
+                title = item.find("title")
+                if title is None or not title.text:
+                    continue
+                keyword = title.text.strip()
+                # 뉴스 제목으로 맥락 추가
+                news_titles = []
+                for ni in item.findall("ht:news_item", ns):
+                    nt = ni.find("ht:news_item_title", ns)
+                    if nt is not None and nt.text:
+                        news_titles.append(nt.text.strip())
+                if news_titles:
+                    context = news_titles[0][:60]
+                    all_trends.append(f"{keyword} ({context})")
+                else:
+                    all_trends.append(keyword)
         except Exception:
             pass
     if all_trends:
-        print(f"[Scheduler] Google Trends ({len(all_trends)}개): {', '.join(all_trends[:5])}...",
+        print(f"[Scheduler] Google Trends ({len(all_trends)}개): {all_trends[0][:40]}...",
               file=sys.stderr)
     return all_trends
 
