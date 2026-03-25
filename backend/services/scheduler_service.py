@@ -78,8 +78,8 @@ def _fetch_google_trends() -> list[str]:
                     if nt is not None and nt.text:
                         news_titles.append(nt.text.strip())
                 if news_titles:
-                    context = news_titles[0][:60]
-                    all_trends.append(f"{keyword} ({context})")
+                    headlines = " / ".join(nt[:50] for nt in news_titles[:3])
+                    all_trends.append(f"{keyword}: {headlines}")
                 else:
                     all_trends.append(keyword)
         except Exception:
@@ -114,7 +114,11 @@ async def _generate_random_theme() -> tuple[str, str]:
         avoid = "\n".join(f"- {t}" for t in existing) if existing else "(없음)"
 
         prompt = f"""당신은 뮤지컬 애니메이션 숏폼 콘텐츠 기획자입니다.
-아래 실시간 뉴스/트렌드 중 하나를 골라, 그 **뉴스의 구체적인 상황**을 뮤지컬 애니메이션 테마로 만드세요.
+
+STEP 1: 아래 트렌드를 읽고 각 키워드가 **왜 화제인지, 무슨 일이 벌어졌는지** 파악하세요.
+(키워드 옆의 뉴스 제목들을 종합하여 맥락을 이해)
+
+STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상황**을 뮤지컬 애니메이션 테마로 만드세요.
 
 핵심 규칙:
 1. 트렌드 1개를 선택하고 inspired_by에 명시
