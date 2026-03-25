@@ -232,6 +232,8 @@ function resetProgressUI(fromStep = 1) {
   if (fromStep <= 1) {
     const lyricsEl = document.getElementById('step-1-lyrics');
     if (lyricsEl) { lyricsEl.textContent = ''; lyricsEl.classList.add('hidden'); }
+    const metaEl = document.getElementById('step-1-meta');
+    if (metaEl) { metaEl.innerHTML = ''; metaEl.classList.add('hidden'); }
   }
   if (fromStep <= 2) {
     const audioEl = document.getElementById('step-2-audio');
