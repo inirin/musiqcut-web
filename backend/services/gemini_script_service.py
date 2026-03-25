@@ -69,6 +69,13 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 - 이 작품에 등장하는 **주인공과 주요 캐릭터**(최대 3명)의 외형을 상세히 정의하세요
 - 모든 장면에서 동일한 캐릭터가 일관되게 등장해야 하므로, 구체적인 외형 묘사가 핵심입니다
 - 각 캐릭터: 이름/별칭, 성별, 나이대, 머리 스타일/색, 눈 색, 피부톤, 체형, 의상, 특징적 액세서리
+- **헤어스타일은 AI 이미지 일관성의 핵심** — 반드시 구체적으로:
+  - 길이: short/medium/long/very long + 정확한 위치 (chin-length, shoulder-length, waist-length 등)
+  - 형태: straight, wavy, curly, braided, ponytail, twin tails, bun, bob cut, pixie cut, undercut 등
+  - 색상: 단색이면 정확한 색 (jet black, platinum blonde, chestnut brown), 그라데이션이면 양쪽 색 명시
+  - 앞머리: bangs 유무 + 형태 (blunt bangs, side-swept bangs, curtain bangs, no bangs 등)
+  - 장식: 헤어핀, 리본, 머리띠, 꽃 등 있으면 반드시 명시
+- description_en에 위 헤어 정보를 **매번 빠짐없이** 포함하세요
 - description_en은 선택한 art_style에 맞춰 작성
 - **첫 번째 캐릭터 = 주인공 = 보컬리스트**: 이 캐릭터의 성별/나이대가 vocal_style과 반드시 일치해야 함
 
