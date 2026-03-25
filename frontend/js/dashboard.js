@@ -115,6 +115,7 @@ async function loadResult() {
           // 캐릭터/보컬 표시 (pipeline.js의 renderStep1Meta 공용)
           const metaEl = document.getElementById('step-1-meta');
           if (metaEl && !metaEl.innerHTML.trim()) {
+            lyricsData.mood = project.mood;  // DB에서 mood 전달 (트렌드 힌트 포함)
             const html = renderStep1Meta(lyricsData);
             if (html) { metaEl.innerHTML = html; metaEl.classList.remove('hidden'); }
           }

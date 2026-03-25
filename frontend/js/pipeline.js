@@ -3,10 +3,21 @@ const _NON_VOCAL = NON_VOCAL; // app.js 전역 참조
 
 function renderStep1Meta(data) {
   const chars = data.characters || [];
-  // 첫 번째 캐릭터 = 보컬리스트 (프롬프트 규칙)
   const vocalist = chars[0];
   const supporting = chars.slice(1);
   let html = '<div class="step1-sections">';
+
+  // 트렌드 영감 (mood에서 [트렌드 힌트: ...] 파싱)
+  const mood = data.mood || '';
+  const hintMatch = mood.match(/\[트렌드 힌트:\s*(.+?)\]$/);
+  if (hintMatch) {
+    const hint = hintMatch[1].trim();
+    const shortHint = hint.length > 80 ? hint.slice(0, 80) + '...' : hint;
+    html += `<div class="step1-section inspired">
+      <div class="step1-section-header"><span class="step1-badge inspired">INSPIRED BY</span></div>
+      <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${hint}</div>
+    </div>`;
+  }
 
   // 보컬리스트 섹션
   if (vocalist || data.vocal_style) {
