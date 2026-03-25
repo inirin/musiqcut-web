@@ -103,12 +103,12 @@ async def _generate_random_theme() -> tuple[str, str]:
 
 
 async def _find_interrupted_project() -> dict | None:
-    """서버 재시작으로 중단된 프로젝트 찾기 (가장 최근 1개)."""
+    """재시도할 실패 작품 찾기 (자동 생성 작품 중 가장 최근 failed 1개)."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         rows = await db.execute_fetchall(
             "SELECT id, theme, mood, length FROM projects "
-            "WHERE status='failed' AND error_msg='서버 재시작으로 중단됨' "
+            "WHERE status='failed' AND source='auto' "
             "ORDER BY updated_at DESC LIMIT 1")
         if rows:
             return dict(rows[0])
