@@ -272,9 +272,12 @@ async def render_video(
     # if whisper_lyrics or scenes:
     #     srt_path = _generate_srt(scenes, out_path, whisper_lyrics=whisper_lyrics)
 
-    # 6. 오디오 합성 + 자막 → 최종 영상
+    # 6. 오디오 fade-out (마지막 2초)
+    fade_sec = 2.0
+    audio_fade = f"afade=t=out:st={audio_dur - fade_sec}:d={fade_sec}" if audio_dur > fade_sec else ""
+
+    # 7. 오디오 합성 + 자막 → 최종 영상
     if srt_path and srt_path.exists() and srt_path.stat().st_size > 10:
-        # 자막 있음: subtitles 필터 + 오디오
         srt_escaped = str(srt_path.resolve()).replace('\\', '/').replace(':', r'\:')
         cmd_final = [
             'ffmpeg', '-y',
@@ -287,6 +290,7 @@ async def render_video(
                 f"Outline=2,Shadow=1,Alignment=2,"
                 f"MarginV=60'"
             ),
+            *(['-af', audio_fade] if audio_fade else []),
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '192k',
             '-shortest',
@@ -294,11 +298,11 @@ async def render_video(
             str(out_path),
         ]
     else:
-        # 자막 없음: 오디오만
         cmd_final = [
             'ffmpeg', '-y',
             '-i', str(concat_tmp),
             '-i', audio_path,
+            *(['-af', audio_fade] if audio_fade else []),
             '-c:v', 'copy',
             '-c:a', 'aac', '-b:a', '192k',
             '-shortest',

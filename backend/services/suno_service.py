@@ -32,19 +32,19 @@ async def measure_audio_duration(file_path: str) -> float:
 
 async def _trim_with_fadeout(file_path: str, max_sec: float,
                              fade_sec: float = 2.0):
-    """곡이 max_sec을 초과하면 fade-out으로 트림."""
+    """곡이 max_sec을 초과하면 트림 (fade-out은 Step 5에서 적용)."""
     duration = await measure_audio_duration(file_path)
     if duration <= max_sec:
         return  # 범위 내, 트림 불필요
 
     print(f"[STEP2] 곡 길이 {duration:.1f}초 > 최대 {max_sec}초, "
-          f"fade-out 트림 적용", file=sys.stderr)
+          f"트림 적용 (fade-out은 Step 5에서)", file=sys.stderr)
 
     trimmed = Path(file_path).with_suffix(".trimmed.mp3")
     cmd = [
         "ffmpeg", "-y", "-i", file_path,
-        "-af", f"afade=t=out:st={max_sec - fade_sec}:d={fade_sec}",
         "-t", str(max_sec),
+        "-c", "copy",
         str(trimmed),
     ]
     result = await asyncio.to_thread(
