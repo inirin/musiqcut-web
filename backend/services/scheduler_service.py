@@ -53,11 +53,35 @@ async def _get_last_auto_created_at() -> str | None:
     return None
 
 
+def _fetch_google_trends() -> list[str]:
+    """Google Trends RSS에서 한국 실시간 트렌드 키워드를 가져옴."""
+    try:
+        import urllib.request as _ur
+        import xml.etree.ElementTree as _ET
+
+        url = "https://trends.google.co.kr/trending/rss?geo=KR"
+        req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = _ur.urlopen(req, timeout=10)
+        root = _ET.fromstring(resp.read())
+        items = root.findall(".//item")
+        trends = [item.find("title").text for item in items[:10] if item.find("title") is not None]
+        if trends:
+            print(f"[Scheduler] Google Trends: {', '.join(trends[:5])}...", file=sys.stderr)
+        return trends
+    except Exception as e:
+        print(f"[Scheduler] Google Trends 조회 실패: {e}", file=sys.stderr)
+        return []
+
+
 async def _generate_random_theme() -> tuple[str, str]:
-    """Gemini에게 완전히 새로운 테마와 분위기를 생성하게 함."""
+    """Google Trends + Gemini로 트렌드 기반 테마 생성."""
     try:
         from backend.utils.gemini_client import gemini_generate
         import json as _json
+
+        # 실시간 트렌드 가져오기
+        trends = await asyncio.to_thread(_fetch_google_trends)
+        trends_text = "\n".join(f"- {t}" for t in trends) if trends else "(조회 실패)"
 
         # 기존 작품 테마를 가져와서 중복 방지
         existing = []
@@ -72,7 +96,12 @@ async def _generate_random_theme() -> tuple[str, str]:
         avoid = "\n".join(f"- {t}" for t in existing) if existing else "(없음)"
 
         prompt = f"""당신은 뮤지컬 애니메이션 숏폼 콘텐츠 기획자입니다.
-완전히 새롭고 독창적인 작품 테마 1개와 분위기를 생성하세요.
+아래 실시간 트렌드 키워드에서 **영감을 받아** 완전히 새롭고 독창적인 작품 테마 1개와 분위기를 생성하세요.
+트렌드 키워드를 직접 사용하지 말고, 연관된 스토리/감정/상황으로 창의적으로 변환하세요.
+예: "스페이스X" → "달에 혼자 남겨진 우주비행사의 귀환", "벚꽃" → "천년 된 벚나무가 마지막 꽃을 피우는 이야기"
+
+실시간 트렌드 키워드 (참고용):
+{trends_text}
 
 장르는 자유: 역사, 판타지, SF, 로맨스, 코미디, 풍자, 호러, 다크 판타지, 성장드라마, 서사극, 슬라이스 오브 라이프, 모험, 미스터리, 뮤지컬, 문학 각색, 신화 재해석 등
 시대는 자유: 고대, 중세, 근대, 현대, 미래, 대체역사, 판타지 세계 등
