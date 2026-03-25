@@ -66,7 +66,7 @@ def _fetch_google_trends() -> list[str]:
             req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = _ur.urlopen(req, timeout=10)
             root = _ET.fromstring(resp.read())
-            for item in root.findall(".//item")[:5]:
+            for item in root.findall(".//item")[:10]:
                 title = item.find("title")
                 if title is None or not title.text:
                     continue
@@ -118,11 +118,11 @@ async def _generate_random_theme() -> tuple[str, str]:
 
 규칙:
 - 아래 제공된 키워드 중 **반드시 1개를 선택**하고, inspired_by에 명시
-- 키워드와의 연결고리가 누가 봐도 느껴져야 함 (너무 추상적 변환 금지)
-- 키워드 자체를 제목에 넣어도 되고, 관련 인물/사건/감정을 테마로 풀어도 됨
-- 예: "스페이스X" → "화성행 편도 티켓 - 돌아올 수 없는 우주비행사의 마지막 메시지"
-- 예: "김효진" → "빛나는 무대 뒤의 그림자 - 배우가 조명이 꺼진 뒤 홀로 남겨질 때"
-- 예: "블리자드" → "눈보라 속의 등대지기 - 세상에서 가장 외로운 겨울밤 당직"
+- **테마 제목만 봐도 어떤 트렌드에서 영감 받았는지 바로 알 수 있어야 함**
+- 키워드나 관련 고유명사를 테마 제목에 직접 포함하세요
+- 예: "스페이스X" → "스페이스X 마지막 승무원의 편지 - 화성행 편도 티켓을 쥔 우주비행사"
+- 예: "김효진" → "김효진의 두 번째 커튼콜 - 무대를 떠났던 배우가 다시 조명 아래 서는 날"
+- 예: "블리자드" → "블리자드가 삼킨 마을 - 3일째 눈에 갇힌 사람들의 합창"
 
 실시간 트렌드 키워드:
 {trends_text}
