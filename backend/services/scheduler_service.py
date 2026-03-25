@@ -149,7 +149,7 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
 {avoid}
 
 반드시 아래 JSON 형식으로만 응답하세요:
-{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "선택한 트렌드 키워드와 뉴스 헤드라인을 원본 그대로 복사 (예: '블리자드: 블리자드, 와우X오로라 합작 신곡 공개 / WoW X 오로라 만났다…'). 위 트렌드 목록에서 선택한 항목 전체를 그대로 붙여넣기", "inspired_detail": "검색으로 파악한 실제 맥락 요약 — 인물이면 성별/나이대/외형 특징/대표작, 사건이면 장소/시기/핵심 상황 포함"}}"""
+{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어)", "inspired_by": "위 트렌드 목록에서 선택한 항목을 원본 그대로 복사 + 검색으로 파악한 맥락 추가. 형식: '원본 트렌드 텍스트 /// 맥락: 인물이면 성별/나이대/외형/대표작, 사건이면 장소/시기/핵심 상황'"}}"""
 
         # Google Search grounding으로 트렌드 맥락 파악 + 테마 생성
         keys = get_api_keys()
@@ -169,15 +169,10 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
         data = _json.loads(text)
         theme = data.get("theme", "").strip()
         mood = data.get("mood", "auto").strip()
-        inspired_by = data.get("inspired_by", "").strip()  # 원본 출처 (프론트 표시)
-        inspired_detail = data.get("inspired_detail", "").strip()  # 맥락 요약 (Step 1용)
+        inspired = data.get("inspired_by", "").strip()
         if theme:
-            # Step 1용: detail을 mood에 포함
-            if inspired_detail:
-                mood = f"{mood} [트렌드 힌트: {inspired_detail}]"
-            # 프론트 표시용: 원본 출처를 theme에 태그
-            if inspired_by:
-                theme = f"{theme} [영감: {inspired_by}]"
+            if inspired:
+                mood = f"{mood} [트렌드 힌트: {inspired}]"
             print(f"[Scheduler] Gemini 테마 생성: {theme[:60]}",
                   file=sys.stderr)
             return theme, mood
