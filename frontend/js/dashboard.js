@@ -57,19 +57,19 @@ async function loadResult() {
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
   document.getElementById('result-theme').textContent = project.theme;
-  // 트렌드 영감 — 작품 정보 카드 하단에 INSPIRED BY 배지로 표시
-  const castEl = document.getElementById('project-cast');
+  // 트렌드 영감 — 테마 아래에 INSPIRED BY 배지로 표시 (자동 생성만)
+  const inspiredEl = document.getElementById('project-inspired');
   const hintMatch = (project.mood || '').match(/\[트렌드 힌트:\s*(.+?)\]$/);
-  if (hintMatch && castEl) {
+  if (hintMatch && inspiredEl) {
     const hint = hintMatch[1].trim();
-    castEl.innerHTML = `<div class="step1-section inspired">
+    inspiredEl.innerHTML = `<div class="step1-section inspired">
       <div class="step1-section-header"><span class="step1-badge inspired">INSPIRED BY</span></div>
       <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${hint}</div>
     </div>`;
-    castEl.style.display = '';
-  } else if (castEl) {
-    castEl.innerHTML = '';
-    castEl.style.display = 'none';
+    inspiredEl.style.display = '';
+  } else if (inspiredEl) {
+    inspiredEl.innerHTML = '';
+    inspiredEl.style.display = 'none';
   }
   // art_style은 lyrics.json에서 로드 (아래 step1 블록에서 처리)
   document.getElementById('result-art-style').textContent = '';
