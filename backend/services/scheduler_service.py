@@ -302,7 +302,10 @@ async def _generation_loop():
     if interrupted:
         print(f"[Scheduler] 중단된 작품 발견, 즉시 resume (id={interrupted['id'][:8]})",
               file=sys.stderr)
-        await _run_auto_generation()
+        try:
+            await _run_auto_generation()
+        except Exception as e:
+            print(f"[Scheduler] resume 중 오류 (계속 진행): {e}", file=sys.stderr)
     else:
         print(f"[Scheduler] 서버 시작 대기 ({_STARTUP_GRACE_SEC}초)...", file=sys.stderr)
         await asyncio.sleep(_STARTUP_GRACE_SEC)
