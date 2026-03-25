@@ -79,9 +79,9 @@ async def _generate_random_theme() -> tuple[str, str]:
         from backend.utils.gemini_client import gemini_generate
         import json as _json
 
-        # 실시간 트렌드 가져오기 (랜덤 3개만 선택하여 편중 방지)
-        all_trends = await asyncio.to_thread(_fetch_google_trends)
-        trends = random.sample(all_trends, min(3, len(all_trends))) if all_trends else []
+        # 실시간 트렌드 가져오기
+        trends = await asyncio.to_thread(_fetch_google_trends)
+        random.shuffle(trends)  # 순서 섞어서 상위 편중 방지
         trends_text = "\n".join(f"- {t}" for t in trends) if trends else "(조회 실패)"
 
         # 기존 작품 테마를 가져와서 중복 방지
