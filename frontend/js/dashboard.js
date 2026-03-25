@@ -56,15 +56,18 @@ async function loadResult() {
 
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
-  document.getElementById('result-theme').textContent = project.theme;
-  // 트렌드 영감 — 테마 아래에 INSPIRED BY 배지로 표시 (자동 생성만)
+  // 테마에서 [원본출처: ...] 태그 분리
+  let themeText = project.theme || '';
+  const sourceMatch = themeText.match(/\s*\[원본출처:\s*(.+?)\]$/);
+  if (sourceMatch) themeText = themeText.replace(sourceMatch[0], '');
+  document.getElementById('result-theme').textContent = themeText;
+  // 트렌드 영감 — 원본 트렌드 키워드+뉴스 헤드라인 표시 (자동 생성만)
   const inspiredEl = document.getElementById('project-inspired');
-  const hintMatch = (project.mood || '').match(/\[트렌드 힌트:\s*(.+?)\]$/);
-  if (hintMatch && inspiredEl) {
-    const hint = hintMatch[1].trim();
+  if (sourceMatch && inspiredEl) {
+    const source = sourceMatch[1].trim();
     inspiredEl.innerHTML = `<div class="step1-section inspired">
       <div class="step1-section-header"><span class="step1-badge inspired">INSPIRED BY</span></div>
-      <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${hint}</div>
+      <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${source}</div>
     </div>`;
     inspiredEl.style.display = '';
   } else if (inspiredEl) {

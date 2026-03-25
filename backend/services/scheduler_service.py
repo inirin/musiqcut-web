@@ -170,11 +170,25 @@ STEP 2: 가장 이야기가 풍부한 트렌드 1개를 골라, 그 **실제 상
         theme = data.get("theme", "").strip()
         mood = data.get("mood", "auto").strip()
         inspired = data.get("inspired_by", "").strip()
+        # 원본 트렌드 키워드+헤드라인 찾기 (프론트 표시용)
+        selected_keyword = data.get("inspired_by", "")
+        original_trend = ""
+        for t in trends:
+            # 키워드 매칭 (트렌드 텍스트에 inspired_by의 첫 단어가 포함)
+            keyword_part = t.split(":")[0].strip() if ":" in t else t
+            if keyword_part and keyword_part in selected_keyword:
+                original_trend = t
+                break
+        if not original_trend:
+            original_trend = inspired  # fallback
         if theme:
             # inspired_by를 mood에 포함 → Step 1에서 캐릭터/보컬/아트 설계에 활용
             if inspired:
                 mood = f"{mood} [트렌드 힌트: {inspired}]"
-            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}",
+            # 원본 트렌드를 theme에 태그로 포함 (프론트 표시용)
+            if original_trend:
+                theme = f"{theme} [원본출처: {original_trend}]"
+            print(f"[Scheduler] Gemini 테마 생성: {theme[:60]} / {mood[:40]}",
                   file=sys.stderr)
             return theme, mood
     except Exception as e:
