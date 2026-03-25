@@ -343,8 +343,8 @@ async def _generation_loop():
         except Exception as e:
             print(f"[Scheduler] 작품 생성 오류: {e}", file=sys.stderr)
 
-        print(f"[Scheduler] 다음 생성: {interval/3600:.1f}시간 후", file=sys.stderr)
-        await asyncio.sleep(interval)
+        # 루프 처음으로 → last_created_at 기준 interval 체크
+        await asyncio.sleep(60)  # 1분 후 다시 체크
 
 
 def start_scheduler(schedule_type: str = "generation"):
