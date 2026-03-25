@@ -75,16 +75,13 @@ async def save_keys(body: SaveKeyRequest):
 @router.get("/status")
 async def keys_status():
     imagen_keys = [k.strip() for k in settings.imagen_api_keys.split(",") if k.strip()] if settings.imagen_api_keys else []
-    def _mask(key):
-        if not key or len(key) < 8: return ""
-        return key[:6] + "..." + key[-4:]
     return {
         "suno": bool(settings.suno_api_key),
-        "suno_masked": _mask(settings.suno_api_key),
+        "suno_masked": settings.suno_api_key or "",
         "gemini": bool(settings.gemini_api_key),
-        "gemini_masked": _mask(settings.gemini_api_key),
+        "gemini_masked": settings.gemini_api_key or "",
         "imagen_count": len(imagen_keys) if imagen_keys else (1 if settings.gemini_api_key else 0),
-        "imagen_keys_masked": [_mask(k) for k in imagen_keys],
+        "imagen_keys_masked": imagen_keys,
         "missing": settings.missing_keys()
     }
 
