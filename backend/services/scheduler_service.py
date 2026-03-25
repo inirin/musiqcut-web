@@ -54,23 +54,26 @@ async def _get_last_auto_created_at() -> str | None:
 
 
 def _fetch_google_trends() -> list[str]:
-    """Google Trends RSS에서 한국 실시간 트렌드 키워드를 가져옴."""
-    try:
-        import urllib.request as _ur
-        import xml.etree.ElementTree as _ET
+    """Google Trends RSS에서 다국가 실시간 트렌드 키워드를 가져옴."""
+    import urllib.request as _ur
+    import xml.etree.ElementTree as _ET
 
-        url = "https://trends.google.co.kr/trending/rss?geo=KR"
-        req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        resp = _ur.urlopen(req, timeout=10)
-        root = _ET.fromstring(resp.read())
-        items = root.findall(".//item")
-        trends = [item.find("title").text for item in items[:10] if item.find("title") is not None]
-        if trends:
-            print(f"[Scheduler] Google Trends: {', '.join(trends[:5])}...", file=sys.stderr)
-        return trends
-    except Exception as e:
-        print(f"[Scheduler] Google Trends 조회 실패: {e}", file=sys.stderr)
-        return []
+    all_trends = []
+    for geo in ["KR", "US", "JP"]:
+        try:
+            url = f"https://trends.google.co.kr/trending/rss?geo={geo}"
+            req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = _ur.urlopen(req, timeout=10)
+            root = _ET.fromstring(resp.read())
+            items = root.findall(".//item")
+            trends = [item.find("title").text for item in items[:5] if item.find("title") is not None]
+            all_trends.extend(trends)
+        except Exception:
+            pass
+    if all_trends:
+        print(f"[Scheduler] Google Trends ({len(all_trends)}개): {', '.join(all_trends[:5])}...",
+              file=sys.stderr)
+    return all_trends
 
 
 async def _generate_random_theme() -> tuple[str, str]:
@@ -112,7 +115,7 @@ async def _generate_random_theme() -> tuple[str, str]:
 
 장르는 자유: 역사, 판타지, SF, 로맨스, 코미디, 풍자, 호러, 다크 판타지, 성장드라마, 서사극, 슬라이스 오브 라이프, 모험, 미스터리, 뮤지컬, 문학 각색, 신화 재해석 등
 
-최근 생성된 테마 (중복 피할 것):
+최근 생성된 테마 (이 테마들과 비슷한 것, 같은 트렌드 키워드 재사용 절대 금지):
 {avoid}
 
 반드시 아래 JSON 형식으로만 응답하세요:
