@@ -723,6 +723,7 @@ pre {
 
   /* 작품 정보 */
   .info-grid { grid-template-columns: 1fr; gap: 8px; }
+  .project-meta-row { flex-direction: column; }
 
   /* 클립 뱃지 */
   .clip-badge { font-size: 0.5rem; padding: 1px 4px; }
@@ -900,6 +901,8 @@ pre {
   border: 1px solid var(--border);
 }
 .step1-section.vocalist { border-left: 3px solid var(--accent); }
+.project-meta-row { display: flex; gap: 8px; }
+.project-meta-row > * { flex: 1; min-width: 0; }
 .step1-section.inspired { border-left: 3px solid var(--warning); }
 .step1-badge.inspired { background: var(--warning); color: #000; }
 .step1-section-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
