@@ -25,13 +25,12 @@ async def lifespan(app: FastAPI):
     # storage 폴더 보장
     Path("storage/projects").mkdir(parents=True, exist_ok=True)
     Path("storage/temp").mkdir(parents=True, exist_ok=True)
-    # 스케줄러 복원
+    # 자동 생성 스케줄러 복원
     try:
         from backend.services.scheduler_service import _get_schedule_config, start_scheduler
-        for stype in ("generation", "feedback"):
-            config = await _get_schedule_config(stype)
-            if config.get("enabled"):
-                start_scheduler(stype)
+        config = await _get_schedule_config("generation")
+        if config.get("enabled"):
+            start_scheduler("generation")
     except Exception:
         pass
     yield

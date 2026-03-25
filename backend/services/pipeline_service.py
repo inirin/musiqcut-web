@@ -704,6 +704,9 @@ async def run_pipeline(
             if wan_scenes:
                 if has_s2v and vocals_path:
                     await asyncio.to_thread(_free_comfyui_vram, "S2V→Wan I2V")
+                # 첫 I2V 클립 스피너 표시
+                _current_clip_idx = wan_indices[0]
+                await _step4_progress_update()
                 _wan_done_count = 0
                 async def _wan_progress(current, total):
                     nonlocal _wan_done_count, _current_clip_idx

@@ -13,8 +13,6 @@ from backend.utils.theme_pool import THEME_POOL, MOOD_POOL  # fallback용
 
 _gen_task = None
 _gen_enabled = False
-_fb_task = None
-_fb_enabled = False
 
 
 async def _get_schedule_config(schedule_type: str = "generation") -> dict:
@@ -200,23 +198,6 @@ async def _run_auto_generation():
         await _record_failure("파이프라인 오류 발생")
 
 
-async def _run_auto_feedback_process():
-    """미처리 피드백이 충분하면 자동 분석."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        count = await db.execute_fetchall(
-            "SELECT COUNT(*) as cnt FROM feedback WHERE processed=0")
-        cnt = count[0]["cnt"] if count else 0
-
-    if cnt < 3:
-        print(f"[Scheduler] 미처리 피드백 {cnt}개 < 3개, 분석 스킵", file=sys.stderr)
-        return
-
-    from backend.routers.feedback import process_feedback
-    print(f"[Scheduler] 미처리 피드백 {cnt}개 → 자동 분석 실행", file=sys.stderr)
-    await process_feedback()
-
-
 async def _record_failure(reason: str = ""):
     """자동 생성 실패/스킵 시간 기록."""
     async with aiosqlite.connect(DB_PATH) as db:
@@ -282,60 +263,20 @@ async def _generation_loop():
         await asyncio.sleep(interval)
 
 
-async def _feedback_loop():
-    """피드백 자동 분석 루프."""
-    global _fb_enabled
-    while _fb_enabled:
-        config = await _get_schedule_config("feedback")
-        if not config.get("enabled"):
-            _fb_enabled = False
-            break
-        interval = config.get("interval_hours", 12.0) * 3600
-
-        last_run = config.get("last_success_at")
-        if last_run:
-            try:
-                last_dt = datetime.fromisoformat(last_run).replace(tzinfo=timezone.utc)
-                elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
-                remaining = interval - elapsed
-                if remaining > 0:
-                    print(f"[Scheduler] 최근 분석 {elapsed/60:.0f}분 전 → {remaining/60:.0f}분 후 실행",
-                          file=sys.stderr)
-                    await asyncio.sleep(remaining)
-                    continue
-            except Exception:
-                pass
-
-        try:
-            await _run_auto_feedback_process()
-        except Exception as e:
-            print(f"[Scheduler] 피드백 분석 오류: {e}", file=sys.stderr)
-
-        print(f"[Scheduler] 다음 분석: {interval/3600:.1f}시간 후", file=sys.stderr)
-        await asyncio.sleep(interval)
-
-
 def start_scheduler(schedule_type: str = "generation"):
-    global _gen_task, _gen_enabled, _fb_task, _fb_enabled
-    if schedule_type == "generation":
-        if _gen_task and not _gen_task.done():
-            return
-        _gen_enabled = True
-        _gen_task = asyncio.create_task(_generation_loop())
-        print("[Scheduler] 작품 생성 스케줄러 시작", file=sys.stderr)
-    elif schedule_type == "feedback":
-        if _fb_task and not _fb_task.done():
-            return
-        _fb_enabled = True
-        _fb_task = asyncio.create_task(_feedback_loop())
-        print("[Scheduler] 피드백 분석 스케줄러 시작", file=sys.stderr)
+    global _gen_task, _gen_enabled
+    if schedule_type != "generation":
+        return
+    if _gen_task and not _gen_task.done():
+        return
+    _gen_enabled = True
+    _gen_task = asyncio.create_task(_generation_loop())
+    print("[Scheduler] 작품 생성 스케줄러 시작", file=sys.stderr)
 
 
 def stop_scheduler(schedule_type: str = "generation"):
-    global _gen_enabled, _fb_enabled
-    if schedule_type == "generation":
-        _gen_enabled = False
-        print("[Scheduler] 작품 생성 스케줄러 중지", file=sys.stderr)
-    elif schedule_type == "feedback":
-        _fb_enabled = False
-        print("[Scheduler] 피드백 분석 스케줄러 중지", file=sys.stderr)
+    global _gen_enabled
+    if schedule_type != "generation":
+        return
+    _gen_enabled = False
+    print("[Scheduler] 작품 생성 스케줄러 중지", file=sys.stderr)

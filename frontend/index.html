@@ -79,7 +79,7 @@
           </div>
           <div id="feedback-list"></div>
           <form class="fb-comment-row" id="fb-comment-form">
-            <textarea id="feedback-comment" class="fb-comment-input auto-resize" placeholder="개선 의견을 남겨주세요..." enterkeyhint="send" rows="1"></textarea>
+            <textarea id="feedback-comment" class="fb-comment-input auto-resize" placeholder="피드백을 남겨주세요..." enterkeyhint="send" rows="1"></textarea>
             <button type="submit" class="btn btn-primary btn-sm">전송</button>
           </form>
         </div>
@@ -284,15 +284,18 @@
       </div>
 
       <div class="card">
-        <div class="card-title">🔄 피드백 & 자동 개선</div>
+        <div class="card-title">💬 피드백</div>
         <ul class="guide-notes">
-          <li>완성된 작품에 👍/👎 + 코멘트로 피드백 가능</li>
-          <li>각 스텝(스토리/음악)과 클립별로도 코멘트 가능</li>
-          <li>피드백이 3개 이상 쌓이면 Gemini가 분석 → 프롬프트 자동 개선</li>
-          <li>개선 이력 조회 + 롤백 가능 (설정 페이지)</li>
-          <li>자동 작품 생성 스케줄 (N시간 간격, 랜덤 테마)</li>
-          <li>자동 피드백 분석 스케줄 (별도 간격)</li>
-          <li>사이클: 자동 생성 → 리뷰 → 코멘트 → 분석 → 개선 → 반복</li>
+          <li>완성된 작품에 👍/👎 + 피드백 가능</li>
+          <li>각 스텝(스토리/음악)과 클립별로도 피드백 가능</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">⏰ 자동 생성 스케줄러</div>
+        <ul class="guide-notes">
+          <li>설정한 간격(기본 2시간)마다 Gemini가 랜덤 테마를 생성하여 자동으로 작품 제작</li>
+          <li>서버 재시작 시 중단된 작품 자동 resume</li>
+          <li>설정 페이지에서 활성화/간격 조정 가능</li>
         </ul>
       </div>
     </div>
@@ -386,31 +389,8 @@
       <div class="card">
         <div class="setting-header">
           <div>
-            <div class="card-title" style="margin:0">피드백 분석 & 프롬프트 개선</div>
-            <div class="setting-desc">평가/코멘트를 분석하여 파이프라인 프롬프트를 자동 개선합니다</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="schedule-fb-toggle" onchange="toggleSchedule('feedback', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label>자동 분석 간격 (시간)</label>
-          <input type="number" id="schedule-fb-interval" value="12" min="1" max="48" step="1" style="width:80px">
-        </div>
-        <span id="schedule-fb-status" class="text-muted" style="font-size:var(--text-sm)"></span>
-        <div class="setting-actions">
-          <button class="btn btn-primary btn-sm" onclick="processFeedback()">수동 분석 실행</button>
-          <button class="btn btn-secondary btn-sm" onclick="rollbackPrompt()">되돌리기</button>
-          <button class="btn btn-secondary btn-sm" onclick="showImprovementHistory()">개선 이력</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="setting-header">
-          <div>
-            <div class="card-title" style="margin:0">자동 작품 생성</div>
-            <div class="setting-desc">설정 간격마다 랜덤 테마로 새 작품을 자동 생성합니다</div>
+            <div class="card-title" style="margin:0">스케줄러</div>
+            <div class="setting-desc">설정 간격마다 Gemini가 랜덤 테마를 생성하여 자동으로 작품을 제작합니다</div>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="schedule-gen-toggle" onchange="toggleSchedule('generation', this.checked)">
@@ -485,7 +465,7 @@
 <script src="/js/dashboard.js?v=1774412500"></script>
 <script src="/js/pipeline.js?v=1774412600"></script>
 <script src="/js/feedback.js?v=1774268702"></script>
-<script src="/js/settings.js?v=1774409900"></script>
+<script src="/js/settings.js?v=1774414000"></script>
 
 </body>
 </html>

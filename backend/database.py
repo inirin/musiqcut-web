@@ -44,17 +44,6 @@ async def init_db():
                 created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS prompt_improvements (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                step_target     INTEGER NOT NULL,
-                feedback_ids    TEXT,
-                before_summary  TEXT,
-                after_summary   TEXT,
-                changes_applied TEXT,
-                applied_at      DATETIME,
-                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
             CREATE TABLE IF NOT EXISTS auto_schedule (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 schedule_type   TEXT DEFAULT 'generation',

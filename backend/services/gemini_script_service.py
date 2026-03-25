@@ -171,13 +171,6 @@ def _parse_json(text: str) -> dict:
         return _try(match.group())
 
 
-def _load_prompt_rules(step: int) -> str:
-    """피드백 기반 프롬프트 오버라이드 로드."""
-    from backend.services.feedback_service import load_overrides
-    overrides = load_overrides()
-    return overrides.get(f"step_{step}_rules", "")
-
-
 async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
     """STEP 1: 스토리/컨셉 + 작곡 지시 생성."""
     guide_fn = LENGTH_GUIDE.get(length, LENGTH_GUIDE["short"])
@@ -189,11 +182,6 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         structure_desc=guide["structure"],
         suno_hint=guide["suno_hint"],
     )
-    # 피드백 기반 추가 규칙
-    extra = _load_prompt_rules(1)
-    if extra:
-        prompt += f"\n\n추가 규칙 (사용자 피드백 반영):\n{extra}"
-
     response = await gemini_generate(
         model="gemini-2.5-flash",
         contents=prompt
@@ -243,9 +231,6 @@ async def generate_scenes(title: str, lyrics: str, mood: str,
         characters_block=characters_block,
         art_style=art_style,
     ) + timing_info
-    extra = _load_prompt_rules(3)
-    if extra:
-        prompt += f"\n\n추가 규칙 (사용자 피드백 반영):\n{extra}"
 
     response = await gemini_generate(
         model="gemini-2.5-flash",

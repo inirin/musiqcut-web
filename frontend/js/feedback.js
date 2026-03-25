@@ -7,7 +7,7 @@ async function submitFeedback(type) {
   let content = null;
   if (type === 'comment') {
     content = document.getElementById('feedback-comment')?.value.trim();
-    if (!content) return toast('코멘트를 입력해주세요', 'error');
+    if (!content) return toast('피드백을 입력해주세요', 'error');
   }
 
   const result = await API.post('/feedback', {
@@ -17,7 +17,7 @@ async function submitFeedback(type) {
   });
 
   if (result.ok) {
-    toast(type === 'comment' ? '코멘트 등록!' : (type === 'like' ? '👍 감사합니다!' : '👎 피드백 반영할게요!'), 'success');
+    toast(type === 'comment' ? '피드백 등록!' : (type === 'like' ? '👍 감사합니다!' : '👎 피드백 반영할게요!'), 'success');
     if (type === 'comment') document.getElementById('feedback-comment').value = '';
     // 버튼 하이라이트
     document.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('active'));
@@ -33,7 +33,7 @@ async function submitStepFeedback(stepNo, btn) {
   if (!id) return;
   const input = btn.parentElement.querySelector('.step-fb-input');
   const content = input?.value.trim();
-  if (!content) return toast('코멘트를 입력해주세요', 'error');
+  if (!content) return toast('피드백을 입력해주세요', 'error');
 
   const result = await API.post('/feedback', {
     project_id: id,
@@ -42,7 +42,7 @@ async function submitStepFeedback(stepNo, btn) {
     content: content
   });
   if (result.ok) {
-    toast(`STEP ${stepNo} 코멘트 등록!`, 'success');
+    toast(`STEP ${stepNo} 피드백 등록!`, 'success');
     input.value = '';
     loadStepFeedbacks(id, stepNo);
     loadFeedbackList(id);
@@ -90,7 +90,7 @@ async function submitLightboxFeedback() {
   const input = document.getElementById('lightbox-feedback-input');
   if (!id || !input) return;
   const content = input.value.trim();
-  if (!content) return toast('코멘트를 입력해주세요', 'error');
+  if (!content) return toast('피드백을 입력해주세요', 'error');
 
   // 라이트박스에서 현재 보고 있는 아이템의 step/scene 판별
   const isClip = _lbType === 'video' || _lbType === 'mixed';
@@ -106,7 +106,7 @@ async function submitLightboxFeedback() {
   });
 
   if (result.ok) {
-    toast(`장면 ${scene_no} 코멘트 등록!`, 'success');
+    toast(`장면 ${scene_no} 피드백 등록!`, 'success');
     input.value = '';
     loadFeedbackList(id);
     loadStepFeedbacks(id, step_no);

@@ -680,7 +680,7 @@ async function _showLightboxItemInner() {
 
   cap.textContent = `${_lbIndex + 1} / ${_lbItems.length}`;
 
-  // 라이트박스 코멘트 로드
+  // 라이트박스 피드백 로드
   if (typeof loadLightboxFeedbacks === 'function' && window._currentProjectId) {
     const isClip = _lbType === 'video' || _lbType === 'mixed';
     loadLightboxFeedbacks(window._currentProjectId, isClip ? 4 : 3, _lbIndex + 1);

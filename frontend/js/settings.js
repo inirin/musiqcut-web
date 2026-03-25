@@ -26,28 +26,20 @@ async function loadSettings() {
 
   updateNotifStatus();
 
-  // 스케줄 설정 로드
+  // 자동 생성 스케줄 로드
   try {
     const scheds = await API.get('/feedback/schedules');
-    for (const [type, sched] of Object.entries(scheds)) {
-      const prefix = type === 'generation' ? 'gen' : 'fb';
-      const toggle = document.getElementById(`schedule-${prefix}-toggle`);
-      const interval = document.getElementById(`schedule-${prefix}-interval`);
-      const status = document.getElementById(`schedule-${prefix}-status`);
+    const sched = scheds.generation;
+    if (sched) {
+      const toggle = document.getElementById('schedule-gen-toggle');
+      const interval = document.getElementById('schedule-gen-interval');
+      const status = document.getElementById('schedule-gen-status');
       if (toggle) toggle.checked = !!sched.enabled;
-      if (interval) interval.value = sched.interval_hours || (type === 'feedback' ? 6 : 2);
-      if (status) {
-        if (type === 'generation') {
-          status.innerHTML = renderGenStatus(sched);
-        } else {
-          status.textContent = sched.enabled ? '활성' : '비활성';
-        }
-      }
+      if (interval) interval.value = sched.interval_hours || 2;
+      if (status) status.innerHTML = renderGenStatus(sched);
     }
   } catch {}
 
-  // 프롬프트 개선 이력
-  if (typeof loadPromptHistory === 'function') loadPromptHistory();
 }
 
 function setPlaceholder(id, text) {
@@ -127,7 +119,7 @@ async function saveGeminiKeys() {
 async function toggleSchedule(type, enabled) {
   const prefix = type === 'generation' ? 'gen' : 'fb';
   const interval = parseFloat(document.getElementById(`schedule-${prefix}-interval`)?.value || '2');
-  const label = type === 'generation' ? '작품 생성' : '피드백 분석';
+  const label = '작품 생성';
   const result = await API.post(`/feedback/schedule?schedule_type=${type}&enabled=${enabled}&interval_hours=${interval}`, {});
   if (result.ok) {
     toast(enabled ? `${label} 스케줄 활성화 (${interval}시간)` : `${label} 스케줄 비활성화`, 'success');
@@ -135,11 +127,6 @@ async function toggleSchedule(type, enabled) {
   }
 }
 
-async function rollbackPrompt() {
-  const result = await API.post('/feedback/rollback', {});
-  toast(result.ok ? '롤백 완료!' : (result.error || '롤백 실패'), result.ok ? 'success' : 'error');
-  if (typeof loadPromptHistory === 'function') loadPromptHistory();
-}
 
 function renderGenStatus(sched) {
   if (!sched.enabled) return '';
@@ -171,8 +158,17 @@ function renderGenStatus(sched) {
   // ── 상단: 현재 상태 (생성 중 or 다음 생성예정) ──
   html += '<div class="gen-primary">';
   if (sched.running_project) {
+    let nextInfo = '';
+    if (sched.last_created_at) {
+      const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
+      if (nextMs <= Date.now()) {
+        nextInfo = ' · 다음 생성 : 완성 후 즉시';
+      } else {
+        nextInfo = ` · 다음 생성 : ${fmtFuture(nextMs - Date.now())}`;
+      }
+    }
     html += `<span class="gen-dot running"></span>
-      <span class="gen-primary-text">생성 중 : ${sched.running_project.title}</span>`;
+      <span class="gen-primary-text">생성 중 : ${sched.running_project.title}<span class="gen-abs-time">${nextInfo}</span></span>`;
   } else if (sched.last_created_at) {
     const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
     const remaining = nextMs - Date.now();

@@ -187,7 +187,7 @@ async function loadResult() {
     stopResourceMonitor();
   }
 
-  // done 스텝에 피드백 입력 + 기존 코멘트 표시
+  // done 스텝에 피드백 입력 + 기존 피드백 표시
   if (typeof showStepFeedbackInputs === 'function') showStepFeedbackInputs();
   if (typeof loadAllStepFeedbacks === 'function') loadAllStepFeedbacks(id);
 
