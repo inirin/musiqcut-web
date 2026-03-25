@@ -105,9 +105,19 @@ def _transcribe_vocals(vocals_path: str) -> list[dict]:
         language="ko",
         word_timestamps=True,
         vad_filter=False,
+        condition_on_previous_text=False,  # 환각 전파 방지
     )
     raw_segments = []
     for seg in segments:
+        # 환각 필터링: 비음성 확률 높거나 압축률 비정상이면 스킵
+        if seg.no_speech_prob > 0.7:
+            print(f"[LyricsSync] 환각 스킵 (no_speech={seg.no_speech_prob:.2f}): "
+                  f"'{seg.text.strip()[:30]}'", file=sys.stderr)
+            continue
+        if seg.compression_ratio > 2.4:
+            print(f"[LyricsSync] 환각 스킵 (compress={seg.compression_ratio:.1f}): "
+                  f"'{seg.text.strip()[:30]}'", file=sys.stderr)
+            continue
         entry = {"text": seg.text.strip(), "start": seg.start, "end": seg.end}
         if seg.words:
             entry["words"] = [{"text": w.word.strip(), "start": w.start, "end": w.end}
