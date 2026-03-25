@@ -1,6 +1,44 @@
 // ── 공통 유틸 ─────────────────────────────────
 const _NON_VOCAL = NON_VOCAL; // app.js 전역 참조
 
+function renderStep1Meta(data) {
+  const chars = data.characters || [];
+  // 첫 번째 캐릭터 = 보컬리스트 (프롬프트 규칙)
+  const vocalist = chars[0];
+  const supporting = chars.slice(1);
+  let html = '<div class="step1-sections">';
+
+  // 보컬리스트 섹션
+  if (vocalist || data.vocal_style) {
+    html += '<div class="step1-section vocalist">';
+    html += '<div class="step1-section-header"><span class="step1-badge vocalist">VOCALIST</span>';
+    if (vocalist) html += `<span class="step1-char-name">${vocalist.name}</span>`;
+    if (data.vocal_style) html += `<span class="step1-vocal-style">${data.vocal_style}</span>`;
+    html += '</div>';
+    if (vocalist?.description_en) {
+      html += `<div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${vocalist.description_en}</div>`;
+    }
+    html += '</div>';
+  }
+
+  // 등장인물 섹션
+  if (supporting.length) {
+    html += '<div class="step1-section">';
+    html += '<div class="step1-section-header"><span class="step1-badge">CAST</span></div>';
+    html += '<div class="step1-cast-grid">';
+    for (const ch of supporting) {
+      html += `<div class="step1-cast-item">
+        <div class="step1-char-name">${ch.name}</div>
+        <div class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')">${ch.description_en}</div>
+      </div>`;
+    }
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function isLipSync(meta) {
   /** _has_vocal (Whisper 타이밍) 우선 → vocal_lines 텍스트 폴백 */
   const hasVocal = meta._has_vocal !== undefined ? meta._has_vocal
@@ -238,6 +276,12 @@ function updateStepUI(step, status, message, data) {
     if (lyricsEl) { lyricsEl.textContent = data.lyrics; lyricsEl.classList.remove('hidden'); }
     if (data.art_style) {
       document.getElementById('result-art-style').textContent = data.art_style;
+    }
+    // 보컬리스트 + 등장인물
+    const metaEl = document.getElementById('step-1-meta');
+    if (metaEl && (data.vocal_style || data.characters?.length)) {
+      metaEl.innerHTML = renderStep1Meta(data);
+      metaEl.classList.remove('hidden');
     }
   }
   // STEP 2: 오디오 (running/done 모두)

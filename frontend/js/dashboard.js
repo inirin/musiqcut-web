@@ -99,24 +99,26 @@ async function loadResult() {
       if (s.finished_at) data.finished_at = s.finished_at;
       updateStepUI(s.step_no, 'done', s.step_name, data);
 
-      // step1 가사 + 아트 스타일
+      // step1 가사 + 아트 스타일 + 캐릭터/보컬
       if (s.step_no === 1) {
-        const lyricsEl = document.getElementById('step-1-lyrics');
-        const artEl = document.getElementById('result-art-style');
-        const needLyrics = lyricsEl && !lyricsEl.textContent;
-        const needArt = artEl && !artEl.textContent;
-        if (needLyrics || needArt) {
-          try {
-            const lyricsData = await fetch(`/storage/projects/${id}/lyrics.json?t=${Date.now()}`).then(r => r.json());
-            if (needLyrics && lyricsData.lyrics) {
-              lyricsEl.textContent = lyricsData.lyrics;
-              lyricsEl.classList.remove('hidden');
-            }
-            if (needArt && lyricsData.art_style) {
-              artEl.textContent = lyricsData.art_style;
-            }
-          } catch {}
-        }
+        try {
+          const lyricsData = await fetch(`/storage/projects/${id}/lyrics.json?t=${Date.now()}`).then(r => r.json());
+          const lyricsEl = document.getElementById('step-1-lyrics');
+          if (lyricsEl && !lyricsEl.textContent && lyricsData.lyrics) {
+            lyricsEl.textContent = lyricsData.lyrics;
+            lyricsEl.classList.remove('hidden');
+          }
+          const artEl = document.getElementById('result-art-style');
+          if (artEl && !artEl.textContent && lyricsData.art_style) {
+            artEl.textContent = lyricsData.art_style;
+          }
+          // 캐릭터/보컬 표시 (pipeline.js의 renderStep1Meta 공용)
+          const metaEl = document.getElementById('step-1-meta');
+          if (metaEl && !metaEl.innerHTML.trim()) {
+            const html = renderStep1Meta(lyricsData);
+            if (html) { metaEl.innerHTML = html; metaEl.classList.remove('hidden'); }
+          }
+        } catch {}
       }
       // step2 오디오 + music_prompt
       if (s.step_no === 2) {

@@ -70,6 +70,7 @@ venv/Scripts/python.exe auto_generate.py
 - `dashboard.js` — 프로젝트 목록
 - `feedback.js` — 피드백 UI
 - `settings.js` — API 키 설정 + 자동 생성 스케줄러 상태 (생성 중/다음 생성/이력)
+- **스타일 가이드**: `frontend/STYLE_GUIDE.md` — 프론트엔드 작업 시 반드시 참조 (간격, 폰트, 보더, 컴포넌트 패턴)
 
 ## Important Rules
 - art_style은 애니메이션/일러스트 스타일만 (실사 photorealistic/photograph 금지, 3D 애니메이션은 OK)

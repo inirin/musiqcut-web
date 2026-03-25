@@ -69,13 +69,20 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 - 모든 장면에서 동일한 캐릭터가 일관되게 등장해야 하므로, 구체적인 외형 묘사가 핵심입니다
 - 각 캐릭터: 이름/별칭, 성별, 나이대, 머리 스타일/색, 눈 색, 피부톤, 체형, 의상, 특징적 액세서리
 - description_en은 선택한 art_style에 맞춰 작성
+- **첫 번째 캐릭터 = 주인공 = 보컬리스트**: 이 캐릭터의 성별/나이대가 vocal_style과 반드시 일치해야 함
+
+보컬 스타일:
+- 주인공 캐릭터의 성별, 나이대, 성격에 어울리는 보컬을 구체적으로 정의하세요
+- vocal_style 필드에 한국어로 간결하게 명시 (예: "20대 여성, 맑고 감성적인 목소리", "40대 남성, 깊고 허스키한 바리톤")
+- music_prompt에도 영문으로 보컬 특성을 포함 — 반드시 vocal_style과 일관되게
 
 출력 형식:
 {{
   "title": "작품 제목 (한국어)",
   "lyrics": "전체 가사 (줄바꿈 포함, 한국어, 반드시 {lyrics_lines_desc})",
-  "music_prompt": "Suno AI용 영문 음악 스타일 프롬프트 (예: epic orchestral, upbeat pop). 반드시 보컬이 포함된 곡이어야 함 (instrumental 금지). 보컬은 주인공 캐릭터에 어울리는 성별/연령대/음색으로 지정. 악기 나열보다 보컬 스타일/감정을 우선 기술할 것. 단, 오페라/성악/벨칸토 등 입을 크게 벌리는 창법은 금지 — 자연스러운 대중음악 창법만 사용 (pop, ballad, R&B, folk, rock, hip-hop, jazz 등). {suno_hint}",
-  "art_style": "선택한 애니메이션 아트 스타일 (영문, 예: 'Pixar-style 3D animation' 또는 'Studio Ghibli watercolor' 또는 'cyberpunk neon cel-shading' — photorealistic/photograph 금지)",
+  "music_prompt": "Suno AI용 영문 음악 스타일 프롬프트. 반드시 보컬 포함 (instrumental 금지). 보컬 성별/연령대/음색을 명시 (예: 'young female vocal with soft breathy tone'). 악기 나열보다 보컬 스타일/감정을 우선 기술. 장르는 자유롭게 (pop, rock, jazz, folk, R&B, hip-hop, musical theatre, opera, choral 등 테마에 맞게 선택). {suno_hint}",
+  "vocal_style": "보컬 스타일 (한국어, 예: '20대 여성, 맑고 감성적인 목소리' — 반드시 주인공 캐릭터의 성별/나이와 일치)",
+  "art_style": "선택한 애니메이션 아트 스타일 (영문, 구체적으로 — photorealistic/photograph 금지)",
   "characters": [
     {{
       "name": "캐릭터 이름/별칭 (한국어)",
@@ -196,6 +203,7 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         "title": data["title"],
         "lyrics": data["lyrics"],
         "music_prompt": data["music_prompt"],
+        "vocal_style": data.get("vocal_style", ""),
         "art_style": data.get("art_style", "Pixar-style 3D animation"),
         "characters": data.get("characters", []),
     }

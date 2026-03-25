@@ -281,7 +281,10 @@ async def run_pipeline(
             story_data = json.loads(lp.read_text(encoding="utf-8"))
             await emitter.update(1, "done",
                 f"스토리 완성: '{story_data['title']}'",
-                {"title": story_data["title"], "lyrics": story_data["lyrics"]})
+                {"title": story_data["title"], "lyrics": story_data["lyrics"],
+                 "art_style": story_data.get("art_style", ""),
+                 "vocal_style": story_data.get("vocal_style", ""),
+                 "characters": story_data.get("characters", [])})
         else:
             await emitter.update(1, "running", "Gemini가 스토리와 작곡 지시를 구성하는 중...")
             await _log_step(project_id, 1, "스토리 생성", "running")
@@ -296,7 +299,9 @@ async def run_pipeline(
             await emitter.update(1, "done",
                 f"스토리 완성: '{story_data['title']}'",
                 {"title": story_data["title"], "lyrics": story_data["lyrics"],
-                 "art_style": story_data.get("art_style", "")})
+                 "art_style": story_data.get("art_style", ""),
+                 "vocal_style": story_data.get("vocal_style", ""),
+                 "characters": story_data.get("characters", [])})
 
         title = story_data["title"]
         lyrics = story_data["lyrics"]

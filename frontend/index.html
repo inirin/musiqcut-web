@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
   <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
-  <link rel="stylesheet" href="/css/style.css?v=1774409200">
+  <link rel="stylesheet" href="/css/style.css?v=1774413500">
 </head>
 <body>
 <div class="app">
@@ -114,7 +114,8 @@
               <div class="step-name">STEP 1 — 스토리/컨셉 생성 (Gemini)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
-              <pre id="step-1-lyrics" class="hidden mt-4 step-prompt"></pre>
+              <pre id="step-1-lyrics" class="hidden step-prompt step-content-block"></pre>
+              <div id="step-1-meta" class="hidden step-content-block"></div>
               <div class="step-feedback hidden" data-step="1">
                 <div class="step-fb-list"></div>
                 <form class="flex gap-2 step-fb-form" data-step="1">
@@ -130,8 +131,8 @@
               <div class="step-name">STEP 2 — 음악 생성 (Suno AI)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
-              <div id="step-2-prompt" class="hidden mt-4 step-prompt"></div>
-              <audio id="step-2-audio" class="hidden mt-4" controls style="width:100%"></audio>
+              <div id="step-2-prompt" class="hidden step-prompt step-content-block"></div>
+              <audio id="step-2-audio" class="hidden step-content-block" controls style="width:100%"></audio>
               <div class="step-feedback hidden" data-step="2">
                 <div class="step-fb-list"></div>
                 <form class="flex gap-2 step-fb-form" data-step="2">
@@ -147,7 +148,7 @@
               <div class="step-name">STEP 3 — 이미지 생성 (Imagen)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
-              <div id="image-previews" class="scene-previews mt-4"></div>
+              <div id="image-previews" class="scene-previews step-content-block"></div>
               <div class="step-feedback hidden" data-step="3">
                 <div class="step-fb-list"></div>
               </div>
@@ -159,7 +160,7 @@
               <div class="step-name">STEP 4 — 영상 클립 생성 (Wan 2.2 S2V + I2V)</div>
               <div class="step-meta"><span class="step-msg">대기 중...</span><span class="step-elapsed hidden"></span></div>
               <div class="progress-bar"><div class="progress-bar-fill" style="width:0%"></div></div>
-              <div id="clip-previews" class="scene-previews mt-4"></div>
+              <div id="clip-previews" class="scene-previews step-content-block"></div>
               <div class="step-feedback hidden" data-step="4">
                 <div class="step-fb-list"></div>
               </div>
@@ -481,8 +482,8 @@
 </div>
 
 <script src="/js/app.js?v=1774268702"></script>
-<script src="/js/dashboard.js?v=1774268702"></script>
-<script src="/js/pipeline.js?v=1774268702"></script>
+<script src="/js/dashboard.js?v=1774412500"></script>
+<script src="/js/pipeline.js?v=1774412600"></script>
 <script src="/js/feedback.js?v=1774268702"></script>
 <script src="/js/settings.js?v=1774409900"></script>
 
