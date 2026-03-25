@@ -65,9 +65,9 @@ async def extract_lyrics_timestamps(
     for i in range(n_clips):
         s = round(vocal_start + i * clip_sec, 2)
         e = round(min(vocal_start + (i + 1) * clip_sec, total_duration), 2)
-        # 단어의 중간점이 이 세그먼트에 속하면 포함 (더 많이 겹친 쪽으로)
+        # 단어의 시작점이 이 세그먼트에 속하면 포함
         words_in = [w for w in all_words
-                    if s <= (w["start"] + w["end"]) / 2 < e]
+                    if s <= w["start"] < e]
         text = " ".join(w["text"] for w in words_in).strip()
         segments.append({
             "text": text,
