@@ -223,7 +223,8 @@ async def _clean_step_files(project_id: str, from_step: int):
         if imgs_dir.exists():
             shutil.rmtree(imgs_dir, ignore_errors=True)
             imgs_dir.mkdir(parents=True, exist_ok=True)
-    if from_step <= 4:
+    if from_step <= 3:
+        # Step 3 이하에서 재시작 시에만 클립 삭제 (이미지가 바뀌면 클립도 무효)
         clips_dir = pdir / "clips"
         if clips_dir.exists():
             shutil.rmtree(clips_dir, ignore_errors=True)
