@@ -109,6 +109,7 @@ async def _find_interrupted_project() -> dict | None:
         rows = await db.execute_fetchall(
             "SELECT id, theme, mood, length FROM projects "
             "WHERE status='failed' AND source='auto' "
+            "AND (error_msg IS NULL OR error_msg NOT LIKE '%보컬 감지 실패%') "
             "ORDER BY updated_at DESC LIMIT 1")
         if rows:
             return dict(rows[0])

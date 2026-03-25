@@ -368,37 +368,10 @@ async def run_pipeline(
                     audio_file, lyrics, demucs_dir,
                     total_duration=actual_duration)
 
-                # 보컬 감지 실패 시 음악 재생성 (최대 2회 재시도)
+                # 보컬 감지 실패 시 프로젝트 실패 처리 (스케줄러가 새 작품으로 재시도)
                 vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
-                retry = 0
-                while vocal_count == 0 and retry < 2:
-                    retry += 1
-                    print(f"[LyricsSync] 보컬 감지 실패 → 음악 재생성 ({retry}/2)",
-                          file=sys.stderr)
-                    await emitter.update(2, "running",
-                        f"보컬 감지 실패, 음악 재생성 중... ({retry}/2)")
-                    # 기존 음원/demucs 삭제
-                    import shutil as _shutil
-                    Path(audio_file).unlink(missing_ok=True)
-                    _demucs = Path(demucs_dir)
-                    if _demucs.exists():
-                        _shutil.rmtree(str(_demucs), ignore_errors=True)
-                    # Suno 재생성
-                    audio_file, actual_duration = await generate_music(
-                        project_id, music_prompt, lyrics, length=length)
-                    scene_count = max(3, math.ceil(actual_duration / get_clip_duration()))
-                    await emitter.update(2, "running",
-                        f"재생성 완료! 가사 재분석 중... ({retry}/2)",
-                        {"audio_url": f"/storage/projects/{project_id}/music/output.mp3"})
-                    demucs_dir = str(Path(lyrics_path(project_id)).parent / "demucs")
-                    timed_lines = await extract_lyrics_timestamps(
-                        audio_file, lyrics, demucs_dir,
-                        total_duration=actual_duration)
-                    vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
-
                 if vocal_count == 0:
-                    print("[LyricsSync] 보컬 감지 실패 (재시도 소진), 원본 가사로 진행",
-                          file=sys.stderr)
+                    raise RuntimeError("보컬 감지 실패 — Whisper가 보컬을 인식하지 못함")
 
             # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만)
             if not _cached_lyrics:
