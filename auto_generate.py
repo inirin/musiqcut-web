@@ -58,6 +58,15 @@ def wait_done(timeout: int = 3600):
     return False
 
 
+def get_random_theme() -> tuple[str, str]:
+    """서버 API로 Gemini 테마 생성, 실패 시 고정 풀 fallback."""
+    result = api_get("/pipeline/random-theme")
+    if result.get("ok"):
+        return result["theme"], result["mood"]
+    log("Gemini 테마 생성 실패, fallback 사용")
+    return random.choice(THEME_POOL), random.choice(MOOD_POOL)
+
+
 def create_new(theme: str, mood: str):
     log(f"자동생성: {theme[:20]}...")
     result = api_post("/pipeline/run", {"theme": theme, "mood": mood, "length": "short"})
@@ -71,18 +80,9 @@ def create_new(theme: str, mood: str):
 def main():
     log("자동 생성 스크립트 시작 (2시간 간격)")
 
-    themes = list(THEME_POOL)
-    random.shuffle(themes)
-    idx = 0
-
     while True:
         time.sleep(INTERVAL_SEC)
-        theme = themes[idx % len(themes)]
-        mood = random.choice(MOOD_POOL)
-        idx += 1
-        if idx >= len(themes):
-            random.shuffle(themes)
-            idx = 0
+        theme, mood = get_random_theme()
         create_new(theme, mood)
 
 

@@ -29,6 +29,16 @@ async def pipeline_status():
     return {"running": _pipeline_lock.locked(), "project_id": _running_project_id}
 
 
+@router.get("/random-theme")
+async def random_theme():
+    """Gemini로 랜덤 테마/분위기 생성."""
+    from backend.services.scheduler_service import _generate_random_theme
+    theme, mood = await _generate_random_theme()
+    if theme:
+        return {"ok": True, "theme": theme, "mood": mood}
+    return {"ok": False, "error": "테마 생성 실패"}
+
+
 @router.post("/run")
 async def run_pipeline_endpoint(body: PipelineRunRequest):
     global _running_project_id

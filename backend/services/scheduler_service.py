@@ -9,7 +9,7 @@ import aiosqlite
 from backend.database import DB_PATH
 
 # 랜덤 테마 풀
-from backend.utils.theme_pool import THEME_POOL, MOOD_POOL
+from backend.utils.theme_pool import THEME_POOL, MOOD_POOL  # fallback용
 
 _gen_task = None
 _gen_enabled = False
@@ -53,6 +53,55 @@ async def _get_last_auto_created_at() -> str | None:
         if row:
             return row[0][0]
     return None
+
+
+async def _generate_random_theme() -> tuple[str, str]:
+    """Gemini에게 완전히 새로운 테마와 분위기를 생성하게 함."""
+    try:
+        from backend.utils.gemini_client import gemini_generate
+        import json as _json
+
+        # 기존 작품 테마를 가져와서 중복 방지
+        existing = []
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                rows = await db.execute_fetchall(
+                    "SELECT theme FROM projects ORDER BY created_at DESC LIMIT 10")
+                existing = [r[0][:30] for r in rows]
+        except Exception:
+            pass
+
+        avoid = "\n".join(f"- {t}" for t in existing) if existing else "(없음)"
+
+        prompt = f"""당신은 뮤지컬 애니메이션 숏폼 콘텐츠 기획자입니다.
+완전히 새롭고 독창적인 작품 테마 1개와 분위기를 생성하세요.
+
+장르는 자유: 역사, 판타지, SF, 로맨스, 코미디, 풍자, 호러, 다크 판타지, 성장드라마, 서사극, 슬라이스 오브 라이프, 모험, 미스터리, 뮤지컬, 문학 각색, 신화 재해석 등
+시대는 자유: 고대, 중세, 근대, 현대, 미래, 대체역사, 판타지 세계 등
+문화권은 자유: 한국, 일본, 중국, 유럽, 중동, 아프리카, 남미, 인도, 북유럽 신화 등 전 세계
+
+최근 생성된 테마 (중복 피할 것):
+{avoid}
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{"theme": "테마 제목 - 한 줄 설명 (한국어)", "mood": "분위기 (한국어, 예: 비극적이고 장엄한)"}}"""
+
+        response = await gemini_generate(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        text = response.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        data = _json.loads(text)
+        theme = data.get("theme", "").strip()
+        mood = data.get("mood", "auto").strip()
+        if theme:
+            print(f"[Scheduler] Gemini 테마 생성: {theme[:40]} / {mood}",
+                  file=sys.stderr)
+            return theme, mood
+    except Exception as e:
+        print(f"[Scheduler] Gemini 테마 생성 실패, fallback: {e}", file=sys.stderr)
+    return "", ""
 
 
 async def _find_interrupted_project() -> dict | None:
@@ -110,9 +159,11 @@ async def _run_auto_generation():
             fail_reason = str(e)[:100]
             print(f"[Scheduler] resume 실패: {e}", file=sys.stderr)
     else:
-        # 새 작품 생성
-        theme = random.choice(THEME_POOL)
-        mood = random.choice(MOOD_POOL)
+        # 새 작품 생성 — Gemini로 테마 생성, 실패 시 고정 풀 fallback
+        theme, mood = await _generate_random_theme()
+        if not theme:
+            theme = random.choice(THEME_POOL)
+            mood = random.choice(MOOD_POOL)
         project_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
