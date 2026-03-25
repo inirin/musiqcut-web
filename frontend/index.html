@@ -88,10 +88,11 @@
       <!-- 작품 정보 -->
       <div class="card">
         <div class="card-title">작품 정보</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">테마</span><span id="result-theme" class="info-value"></span>
-          </div>
+        <div class="info-item step-content-block">
+          <span class="info-label">테마</span><span id="result-theme" class="info-value"></span>
+        </div>
+        <div id="project-inspired" class="step-content-block" style="display:none"></div>
+        <div class="info-grid step-content-block">
           <div class="info-item">
             <span class="info-label">아트 스타일</span><span id="result-art-style" class="info-value"></span>
           </div>
@@ -102,7 +103,6 @@
             <span class="info-label">생성일</span><span id="result-date" class="info-value"></span>
           </div>
         </div>
-        <div id="project-inspired" class="step-content-block" style="display:none"></div>
       </div>
 
       <!-- 파이프라인 (실시간 진행 + 과거 결과 통합) -->
