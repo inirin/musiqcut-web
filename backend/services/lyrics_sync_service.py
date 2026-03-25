@@ -60,7 +60,8 @@ async def extract_lyrics_timestamps(
                   f"세그먼트 시작 {vocal_start:.1f}초", file=sys.stderr)
 
     effective_duration = total_duration - vocal_start
-    n_clips = max(1, math.ceil(effective_duration / clip_sec))
+    # 부동소수점 오차 방지 (30.001초 → 7세그먼트 되는 문제)
+    n_clips = max(1, round(effective_duration / clip_sec))
     segments = []
     for i in range(n_clips):
         s = round(vocal_start + i * clip_sec, 2)
