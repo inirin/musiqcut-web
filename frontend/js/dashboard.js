@@ -19,12 +19,10 @@ function _dashScheduleText(sched) {
   } else if (sched.last_created_at) {
     const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
     const remaining = nextMs - Date.now();
-    if (remaining <= 0) {
-      return `<span class="gen-dot pending"></span>
-        <span class="gen-primary-text">자동 생성 예정 : 곧 시작</span>`;
-    }
+    const text = remaining <= 0 ? '자동 생성 예정 : 곧 시작' : `자동 생성 예정 : ${fmtFuture(remaining)}`;
     return `<span class="gen-dot pending"></span>
-      <span class="gen-primary-text">자동 생성 예정 : ${fmtFuture(remaining)}</span>`;
+      <span class="gen-primary-text" style="flex:1">${text}</span>
+      <span style="opacity:0.5">›</span>`;
   }
   return '';
 }
@@ -38,7 +36,10 @@ async function loadDashboard() {
     if (el && sched?.enabled) {
       const isRunning = !!sched.running_project;
       const pid = isRunning ? sched.running_project.id : '';
-      el.innerHTML = `<div class="gen-primary dash-schedule-box${isRunning ? ' clickable' : ''}" style="margin-bottom:8px"${isRunning ? ` onclick="window._currentProjectId='${pid}';showPage('result')"` : ''}>${_dashScheduleText(sched)}</div>`;
+      const onclick = isRunning
+        ? `window._currentProjectId='${pid}';showPage('result')`
+        : `showPage('settings')`;
+      el.innerHTML = `<div class="gen-primary dash-schedule-box clickable" style="margin-bottom:8px" onclick="${onclick}">${_dashScheduleText(sched)}</div>`;
     } else if (el) {
       el.innerHTML = '';
     }
