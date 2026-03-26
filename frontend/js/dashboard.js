@@ -210,10 +210,14 @@ async function loadResult() {
         ? `${s.step_name} 중... ${runData.current}/${runData.total}`
         : '실행 중...';
       // DB에 clip_slots가 있으면 그대로 사용, 없으면 current 기반으로 생성
-      if (runData.current > 0) {
+      {
         if (s.step_no === 3) {
-          runData.image_urls = Array.from({ length: runData.current }, (_, i) =>
-            `/storage/projects/${id}/images/scene_${String(i+1).padStart(2,'0')}.png`);
+          // running 중: DB의 current 또는 image_urls로 기존 이미지 표시
+          const imgCount = runData.current || runData.image_urls?.length || 0;
+          if (imgCount > 0) {
+            runData.image_urls = Array.from({ length: imgCount }, (_, i) =>
+              `/storage/projects/${id}/images/scene_${String(i+1).padStart(2,'0')}.png`);
+          }
         } else if (s.step_no === 4 && !runData.clip_slots) {
           // clip_slots 없으면 레거시 순차 URL 생성
           runData.clip_urls = Array.from({ length: runData.current }, (_, i) =>
