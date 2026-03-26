@@ -808,6 +808,9 @@ pre {
 }
 .res-value[data-level="high"] { color: var(--error); }
 
+/* 라이트박스 재생성 버튼 */
+.lightbox-regen-wrap { display: flex; gap: 8px; justify-content: center; margin: 8px auto; max-width: 500px; }
+
 /* 라이트박스 피드백 — .lightbox-fb-wrap 스타일은 위 .lightbox-info와 공유 */
 #lightbox-fb-list:empty { display: none; }
 #lightbox-fb-list:empty + .lightbox-fb-row { margin-top: 0; }

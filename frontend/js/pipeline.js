@@ -38,6 +38,28 @@ function renderStep1Meta(data) {
   return html;
 }
 
+async function regenScene(includeImage) {
+  const id = window._currentProjectId;
+  if (!id) return;
+  const sceneNo = _lbIndex + 1;
+  const label = includeImage ? '이미지+클립' : '클립';
+  if (!confirm(`장면 ${sceneNo}의 ${label}을 재생성하시겠습니까?`)) return;
+  closeLightbox();
+  toast(`장면 ${sceneNo} ${label} 재생성 시작...`);
+  const result = await API.post(`/pipeline/${id}/regenerate-scene/${sceneNo}?include_image=${includeImage}`, {});
+  if (result.ok) {
+    resetProgressUI(result.from_step || 3);
+    // WebSocket 연결
+    if (_wsHandle) _wsHandle.close();
+    _pipelineRunning = true;
+    _pipelineProjectId = id;
+    _wsHandle = API.connectWS(id, handlePipelineEvent);
+    document.getElementById('result-status').innerHTML = statusBadge('running');
+  } else {
+    toast(result.error || '재생성 실패', 'error');
+  }
+}
+
 function isLipSync(meta) {
   /** _has_vocal (Whisper 타이밍) 우선 → vocal_lines 텍스트 폴백 */
   const hasVocal = meta._has_vocal !== undefined ? meta._has_vocal
@@ -706,6 +728,14 @@ async function _showLightboxItemInner() {
   }
 
   cap.textContent = `${_lbIndex + 1} / ${_lbItems.length}`;
+
+  // 재생성 버튼 표시 (done 상태 작품 + 클립/이미지 뷰)
+  const regenWrap = document.getElementById('lightbox-regen');
+  if (regenWrap) {
+    const stepEl = document.getElementById('step-5');
+    const isDone = stepEl && stepEl.classList.contains('done');
+    regenWrap.style.display = isDone ? '' : 'none';
+  }
 
   // 라이트박스 피드백 로드
   if (typeof loadLightboxFeedbacks === 'function' && window._currentProjectId) {

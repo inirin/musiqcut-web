@@ -39,6 +39,75 @@ async def random_theme():
     return {"ok": False, "error": "테마 생성 실패"}
 
 
+@router.post("/{project_id}/regenerate-scene/{scene_no}")
+async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_image: bool = True):
+    """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume."""
+    global _running_project_id
+    if _pipeline_lock.locked():
+        return {"ok": False, "error": "다른 작업이 진행 중입니다."}
+
+    from pathlib import Path
+    from backend.utils.file_manager import image_path, clip_path
+
+    # 해당 장면 파일 삭제
+    deleted = []
+    if include_image:
+        img = image_path(project_id, scene_no)
+        if img.exists():
+            img.unlink()
+            deleted.append(f"image scene_{scene_no:02d}")
+        from_step = 3  # 이미지부터
+    else:
+        from_step = 4  # 클립만
+
+    clip = clip_path(project_id, scene_no)
+    if clip.exists():
+        clip.unlink()
+        deleted.append(f"clip_{scene_no:02d}")
+
+    # 비디오도 삭제 (Step 5 재합성 필요)
+    video_dir = Path(f"storage/projects/{project_id}/video")
+    if video_dir.exists():
+        import shutil
+        shutil.rmtree(str(video_dir), ignore_errors=True)
+
+    print(f"[Regen] 장면 {scene_no} 삭제: {deleted}", file=__import__('sys').stderr)
+
+    # DB 스텝 초기화 + resume
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        row = await db.execute("SELECT theme, mood, length FROM projects WHERE id=?", (project_id,))
+        row = await row.fetchone()
+        if not row:
+            return {"ok": False, "error": "프로젝트를 찾을 수 없습니다."}
+        theme, mood, length = row["theme"], row["mood"], row["length"] or "short"
+
+        await db.execute(
+            "DELETE FROM pipeline_steps WHERE project_id=? AND step_no>=?",
+            (project_id, from_step))
+        await db.execute(
+            "DELETE FROM feedback WHERE project_id=? AND step_no>=?",
+            (project_id, from_step))
+        await db.commit()
+
+    _running_project_id = project_id
+    emitter = ProgressEmitter(project_id)
+    register_emitter(project_id, emitter)
+
+    async def _run():
+        async with _pipeline_lock:
+            try:
+                from backend.services.pipeline_service import run_pipeline
+                await run_pipeline(project_id, theme, mood, emitter,
+                                   resume_from=from_step, length=length)
+            finally:
+                _clear_running()
+
+    asyncio.create_task(_run())
+    return {"ok": True, "project_id": project_id, "scene_no": scene_no,
+            "from_step": from_step, "deleted": deleted}
+
+
 @router.post("/run")
 async def run_pipeline_endpoint(body: PipelineRunRequest):
     global _running_project_id
