@@ -49,12 +49,12 @@ async function regenScene(includeImage) {
   const result = await API.post(`/pipeline/${id}/regenerate-scene/${sceneNo}?include_image=${includeImage}`, {});
   if (result.ok) {
     resetProgressUI(result.from_step || 3);
-    // WebSocket 연결
     if (_wsHandle) _wsHandle.close();
     _pipelineRunning = true;
     _pipelineProjectId = id;
     _wsHandle = API.connectWS(id, handlePipelineEvent);
     document.getElementById('result-status').innerHTML = statusBadge('running');
+    toast(`장면 ${sceneNo} 재생성 시작!`, 'success');
   } else {
     toast(result.error || '재생성 실패', 'error');
   }
@@ -729,12 +729,12 @@ async function _showLightboxItemInner() {
 
   cap.textContent = `${_lbIndex + 1} / ${_lbItems.length}`;
 
-  // 재생성 버튼 표시 (done 상태 작품 + 클립/이미지 뷰)
+  // 재생성 버튼 표시 (Step 3 이상 완료된 작품)
   const regenWrap = document.getElementById('lightbox-regen');
   if (regenWrap) {
-    const stepEl = document.getElementById('step-5');
-    const isDone = stepEl && stepEl.classList.contains('done');
-    regenWrap.style.display = isDone ? '' : 'none';
+    const step3 = document.getElementById('step-3');
+    const hasImages = step3 && (step3.classList.contains('done') || step3.classList.contains('running'));
+    regenWrap.style.display = hasImages ? '' : 'none';
   }
 
   // 라이트박스 피드백 로드

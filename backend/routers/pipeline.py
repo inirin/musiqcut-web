@@ -41,10 +41,8 @@ async def random_theme():
 
 @router.post("/{project_id}/regenerate-scene/{scene_no}")
 async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_image: bool = True):
-    """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume."""
+    """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume. 진행 중이면 완료 후 실행."""
     global _running_project_id
-    if _pipeline_lock.locked():
-        return {"ok": False, "error": "다른 작업이 진행 중입니다."}
 
     from pathlib import Path
     from backend.utils.file_manager import image_path, clip_path
