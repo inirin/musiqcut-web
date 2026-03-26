@@ -323,7 +323,7 @@ async def _record_failure(reason: str = ""):
         print(f"[Scheduler] 실패 기록: {reason}", file=sys.stderr)
 
 
-_STARTUP_GRACE_SEC = 60  # 서버 시작 후 1분간 자동 생성 보류 (재시작 시 즉시 생성 방지)
+_STARTUP_GRACE_SEC = 30  # 서버 시작 후 30초간 자동 생성 보류 (재시작 시 즉시 생성 방지)
 
 
 async def _generation_loop():
