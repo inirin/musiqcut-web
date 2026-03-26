@@ -53,41 +53,61 @@ async def _get_last_auto_created_at() -> str | None:
     return None
 
 
-def _fetch_google_trends() -> list[str]:
-    """Google Trends RSS에서 다국가 트렌드 키워드 + 뉴스 맥락을 가져옴."""
+def _fetch_trends() -> list[str]:
+    """Google Trends + 네이버 뉴스 RSS에서 트렌드/뉴스 수집."""
     import urllib.request as _ur
     import xml.etree.ElementTree as _ET
 
-    ns = {"ht": "https://trends.google.com/trending/rss"}
-    all_trends = []
-    for geo in ["KR"]:
+    all_items = []
+
+    # 1) Google Trends 한국
+    try:
+        ns = {"ht": "https://trends.google.com/trending/rss"}
+        url = "https://trends.google.co.kr/trending/rss?geo=KR"
+        req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = _ur.urlopen(req, timeout=10)
+        root = _ET.fromstring(resp.read())
+        for item in root.findall(".//item")[:5]:
+            title = item.find("title")
+            if title is None or not title.text:
+                continue
+            keyword = title.text.strip()
+            news_titles = []
+            for ni in item.findall("ht:news_item", ns):
+                nt = ni.find("ht:news_item_title", ns)
+                if nt is not None and nt.text:
+                    news_titles.append(nt.text.strip())
+            if news_titles:
+                headlines = " / ".join(nt[:50] for nt in news_titles[:3])
+                all_items.append(f"[트렌드] {keyword}: {headlines}")
+            else:
+                all_items.append(f"[트렌드] {keyword}")
+    except Exception:
+        pass
+
+    # 2) 한국 주요 언론사 RSS (각 2개씩)
+    news_feeds = [
+        ("동아일보", "https://rss.donga.com/total.xml"),
+        ("한겨레", "https://www.hani.co.kr/rss/"),
+        ("조선일보", "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml"),
+        ("연합뉴스", "https://www.yna.co.kr/rss/news.xml"),
+    ]
+    for label, url in news_feeds:
         try:
-            url = f"https://trends.google.co.kr/trending/rss?geo={geo}"
             req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            resp = _ur.urlopen(req, timeout=10)
+            resp = _ur.urlopen(req, timeout=5)
             root = _ET.fromstring(resp.read())
-            for item in root.findall(".//item")[:10]:
+            for item in root.findall(".//item")[:2]:
                 title = item.find("title")
-                if title is None or not title.text:
-                    continue
-                keyword = title.text.strip()
-                # 뉴스 제목으로 맥락 추가
-                news_titles = []
-                for ni in item.findall("ht:news_item", ns):
-                    nt = ni.find("ht:news_item_title", ns)
-                    if nt is not None and nt.text:
-                        news_titles.append(nt.text.strip())
-                if news_titles:
-                    headlines = " / ".join(nt[:50] for nt in news_titles[:3])
-                    all_trends.append(f"{keyword}: {headlines}")
-                else:
-                    all_trends.append(keyword)
+                if title is not None and title.text:
+                    all_items.append(f"[{label}] {title.text.strip()[:80]}")
         except Exception:
             pass
-    if all_trends:
-        print(f"[Scheduler] Google Trends ({len(all_trends)}개): {all_trends[0][:40]}...",
+
+    if all_items:
+        print(f"[Scheduler] 트렌드+뉴스 ({len(all_items)}개): {all_items[0][:40]}...",
               file=sys.stderr)
-    return all_trends
+    return all_items
 
 
 async def _generate_random_theme() -> tuple[str, str]:
@@ -99,7 +119,7 @@ async def _generate_random_theme() -> tuple[str, str]:
         import json as _json
 
         # 실시간 트렌드 가져오기
-        trends = await asyncio.to_thread(_fetch_google_trends)
+        trends = await asyncio.to_thread(_fetch_trends)
         random.shuffle(trends)  # 순서 섞어서 상위 편중 방지
         trends_text = "\n".join(f"- {t}" for t in trends) if trends else "(조회 실패)"
 
