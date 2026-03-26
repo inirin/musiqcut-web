@@ -16,7 +16,6 @@ function _dashScheduleText(sched) {
     return `<span class="gen-dot running"></span>
       <span class="gen-primary-text" style="flex:1">자동 생성 중 : ${title}</span>
       <span style="opacity:0.5">›</span>`;
-  }
   } else if (sched.last_created_at) {
     const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
     const remaining = nextMs - Date.now();
