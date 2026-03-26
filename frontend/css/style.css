@@ -879,6 +879,8 @@ pre {
   border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 .gen-primary-text { font-size: var(--text-sm); font-weight: 500; }
+.dash-schedule-box.clickable { cursor: pointer; transition: border-color 0.15s; }
+.dash-schedule-box.clickable:hover { border-color: var(--accent); }
 
 /* 하단: 이력 */
 .gen-history { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }

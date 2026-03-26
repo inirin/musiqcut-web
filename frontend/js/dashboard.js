@@ -11,17 +11,20 @@ function _dashScheduleText(sched) {
     return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
   };
   if (sched.running_project) {
+    const pid = sched.running_project.id;
+    const title = sched.running_project.title;
     return `<span class="gen-dot running"></span>
-      <span class="gen-primary-text">생성 중 : ${sched.running_project.title}</span>`;
+      <span class="gen-primary-text">자동 생성 중 : ${title}</span>`;
+  }
   } else if (sched.last_created_at) {
     const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
     const remaining = nextMs - Date.now();
     if (remaining <= 0) {
       return `<span class="gen-dot pending"></span>
-        <span class="gen-primary-text">다음 생성 : 곧 시작</span>`;
+        <span class="gen-primary-text">자동 생성 예정 : 곧 시작</span>`;
     }
     return `<span class="gen-dot pending"></span>
-      <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)}</span>`;
+      <span class="gen-primary-text">자동 생성 예정 : ${fmtFuture(remaining)}</span>`;
   }
   return '';
 }
@@ -33,7 +36,9 @@ async function loadDashboard() {
     const sched = scheds.generation;
     const el = document.getElementById('dash-schedule-status');
     if (el && sched?.enabled) {
-      el.innerHTML = `<div class="gen-primary" style="margin-bottom:8px">${_dashScheduleText(sched)}</div>`;
+      const isRunning = !!sched.running_project;
+      const pid = isRunning ? sched.running_project.id : '';
+      el.innerHTML = `<div class="gen-primary dash-schedule-box${isRunning ? ' clickable' : ''}" style="margin-bottom:8px"${isRunning ? ` onclick="window._currentProjectId='${pid}';showPage('result')"` : ''}>${_dashScheduleText(sched)}</div>`;
     } else if (el) {
       el.innerHTML = '';
     }
