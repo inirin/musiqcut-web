@@ -17,6 +17,7 @@ async function loadSettings() {
     if (keys[0]) document.getElementById('key-input-gemini').value = keys[0];
     else if (status.gemini_masked) document.getElementById('key-input-gemini').value = status.gemini_masked;
     if (keys[1]) document.getElementById('key-input-gemini2').value = keys[1];
+    if (keys[2]) document.getElementById('key-input-gemini3').value = keys[2];
   } else {
     updateKeyIndicator('gemini', false);
   }
@@ -98,8 +99,9 @@ function clearInputs(api) {
 async function saveGeminiKeys() {
   const k1 = document.getElementById('key-input-gemini')?.value.trim();
   const k2 = document.getElementById('key-input-gemini2')?.value.trim();
+  const k3 = document.getElementById('key-input-gemini3')?.value.trim();
   if (!k1) return toast('주키를 입력해주세요', 'error');
-  const keys = [k1, k2].filter(Boolean).join(',');
+  const keys = [k1, k2, k3].filter(Boolean).join(',');
   try {
     const result = await API.post('/keys/save', {
       gemini_api_key: k1,
@@ -109,6 +111,7 @@ async function saveGeminiKeys() {
       toast(`Gemini 키 ${keys.split(',').length}개 저장 완료`, 'success');
       document.getElementById('key-input-gemini').value = '';
       document.getElementById('key-input-gemini2').value = '';
+      document.getElementById('key-input-gemini3').value = '';
       await loadSettings();
     } else {
       toast(`저장 실패: ${result.error || ''}`, 'error');

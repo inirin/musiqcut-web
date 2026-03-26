@@ -336,7 +336,7 @@
         <div class="setting-header">
           <div>
             <div class="card-title" style="margin:0">Google Gemini</div>
-            <div class="setting-desc">스크립트 + 이미지 + 가사 보정 (키2 등록 시 할당량 자동 로테이션)</div>
+            <div class="setting-desc">스크립트 + 이미지 + 가사 보정 (복수 키 등록 시 할당량 자동 로테이션)</div>
           </div>
           <span id="key-status-gemini" class="status-dot-label"></span>
         </div>
@@ -354,6 +354,10 @@
         <div class="form-group">
           <label>API Key 2 (할당량 초과 시 자동 전환)</label>
           <input type="text" id="key-input-gemini2" placeholder="AIzaSy... (선택)">
+        </div>
+        <div class="form-group">
+          <label>API Key 3 (선택)</label>
+          <input type="text" id="key-input-gemini3" placeholder="AIzaSy... (선택)">
         </div>
         <div class="setting-actions">
           <button class="btn btn-primary btn-sm" onclick="saveGeminiKeys()">저장</button>
