@@ -38,7 +38,7 @@ async function loadDashboard() {
       const pid = isRunning ? sched.running_project.id : '';
       const onclick = isRunning
         ? `window._currentProjectId='${pid}';showPage('result')`
-        : `showPage('settings')`;
+        : `showPage('settings');setTimeout(()=>document.getElementById('auto-generation-card')?.scrollIntoView({behavior:'smooth'}),100)`;
       el.innerHTML = `<div class="gen-primary dash-schedule-box clickable" style="margin-bottom:8px" onclick="${onclick}">${_dashScheduleText(sched)}</div>`;
     } else if (el) {
       el.innerHTML = '';
