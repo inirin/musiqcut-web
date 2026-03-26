@@ -219,7 +219,7 @@ textarea { resize: vertical; min-height: 80px; }
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 .project-card {
   background: var(--surface2); border: 1px solid var(--border);
@@ -419,7 +419,9 @@ textarea { resize: vertical; min-height: 80px; }
 /* ══════════════════════════════════════════
    API 상태 바 (대시보드)
 ══════════════════════════════════════════ */
-.api-status-bar { margin-bottom: 16px; }
+.page-header { margin-bottom: 12px; }
+.api-status-bar { margin-bottom: 12px; }
+#dash-schedule-status { margin-bottom: 12px; }
 .api-status-row {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 8px 14px; border-radius: var(--radius-sm);
