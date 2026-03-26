@@ -273,8 +273,7 @@ async def _run_auto_generation():
         # 새 작품 생성 — Gemini로 테마 생성, 실패 시 고정 풀 fallback
         theme, mood = await _generate_random_theme()
         if not theme:
-            theme = random.choice(THEME_POOL)
-            mood = random.choice(MOOD_POOL)
+            raise RuntimeError("Gemini 테마 생성 실패")
         project_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
