@@ -679,9 +679,7 @@ async function _showLightboxItemInner() {
     } else if (!window._currentProjectId || endSec <= startSec) {
       if (audioRow) audioRow.style.display = 'none';
     } else {
-      const audioSrc = isLipSyncClip
-        ? `/storage/projects/${window._currentProjectId}/demucs/htdemucs/output/vocals.wav`
-        : `/storage/projects/${window._currentProjectId}/music/output.mp3`;
+      const audioSrc = `/storage/projects/${window._currentProjectId}/music/output.mp3`;
 
       audioEl.src = audioSrc;
       audioEl.currentTime = startSec;
