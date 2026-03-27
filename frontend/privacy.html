@@ -1,28 +1,52 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>뮤직컷 - 개인정보처리방침</title>
-<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;line-height:1.8;color:#333}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:24px}</style>
+<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;line-height:1.8;color:#333}h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:24px}ul{padding-left:20px}</style>
 </head>
 <body>
 <h1>뮤직컷 (MusiqCut) 개인정보처리방침</h1>
-<p>최종 수정일: 2026년 3월 27일</p>
+<p>최종 수정일: 2026년 3월 28일</p>
+<p>뮤직컷(musiqcut.com)은 AI 기반 숏폼 뮤직비디오 자동 생성 서비스입니다. 본 방침은 서비스 이용 과정에서 수집되는 정보와 그 처리에 대해 안내합니다.</p>
 
 <h2>1. 수집하는 정보</h2>
-<p>소셜 미디어 계정 연동 시 해당 플랫폼의 OAuth 토큰(접근 토큰, 갱신 토큰)과 채널/계정 이름을 저장합니다. 그 외 개인정보는 수집하지 않습니다.</p>
+<ul>
+<li><strong>인증 정보</strong>: Cloudflare Access를 통한 Google 로그인 시 이메일 주소가 인증 목적으로 사용됩니다. 이 정보는 Cloudflare에서 관리하며 본 서비스 서버에 저장되지 않습니다.</li>
+<li><strong>소셜 미디어 연동 정보</strong>: YouTube, Instagram, TikTok 계정 연동 시 해당 플랫폼의 OAuth 토큰(접근 토큰, 갱신 토큰)과 채널/계정 이름을 서버 로컬 데이터베이스에 저장합니다.</li>
+<li><strong>API 키</strong>: 사용자가 입력한 외부 서비스 API 키(Google Gemini, Suno AI)를 서버 설정 파일에 저장합니다.</li>
+</ul>
 
 <h2>2. 정보의 이용 목적</h2>
-<p>수집된 정보는 오직 사용자가 요청한 영상 업로드 기능을 수행하기 위해서만 사용됩니다.</p>
+<ul>
+<li>소셜 미디어 토큰: 사용자가 요청한 영상 업로드 기능 수행</li>
+<li>API 키: AI 뮤직비디오 생성 파이프라인 실행 (스크립트 생성, 음악 생성, 이미지/영상 생성)</li>
+</ul>
 
-<h2>3. 정보의 보관 및 삭제</h2>
-<p>연동 해제 시 저장된 토큰과 계정 정보는 즉시 삭제됩니다. 업로드 이력(영상 ID, URL)은 서비스 이용 기록으로 보관됩니다.</p>
+<h2>3. 외부 서비스 연동</h2>
+<p>본 서비스는 다음 외부 서비스의 API를 사용합니다:</p>
+<ul>
+<li><strong>Google Gemini API</strong>: 스크립트/장면 생성, 이미지 생성 (Imagen 4)</li>
+<li><strong>Suno AI</strong>: 음악 생성</li>
+<li><strong>YouTube Data API</strong>: 영상 업로드</li>
+<li><strong>Instagram Graph API</strong>: 릴스 업로드</li>
+<li><strong>TikTok API</strong>: 영상 업로드</li>
+<li><strong>Cloudflare Access</strong>: 접근 인증</li>
+</ul>
+<p>각 서비스로 전송되는 데이터는 해당 서비스의 개인정보처리방침을 따릅니다.</p>
 
-<h2>4. 제3자 제공</h2>
-<p>수집된 정보는 제3자에게 제공되지 않습니다. 영상 업로드 시 해당 플랫폼(YouTube, Instagram, TikTok)의 API를 통해 직접 전송됩니다.</p>
+<h2>4. 정보의 보관 및 삭제</h2>
+<ul>
+<li>소셜 미디어 연동 해제 시 저장된 토큰과 계정 정보는 즉시 삭제됩니다.</li>
+<li>생성된 작품(영상, 이미지, 음악)은 서버 로컬 스토리지에 보관되며, 작품 삭제 시 모든 관련 파일이 함께 삭제됩니다.</li>
+<li>업로드 이력(영상 ID, URL)은 서비스 이용 기록으로 보관됩니다.</li>
+</ul>
 
-<h2>5. 데이터 삭제 요청</h2>
-<p>설정 페이지에서 플랫폼 연결 해제 시 모든 인증 정보가 삭제됩니다.</p>
+<h2>5. 제3자 제공</h2>
+<p>수집된 정보는 제3자에게 제공되지 않습니다. 영상 업로드 시 해당 플랫폼 API를 통해 직접 전송됩니다.</p>
 
-<h2>6. 문의</h2>
-<p>개인정보 관련 문의는 서비스 관리자에게 연락해주세요.</p>
+<h2>6. 데이터 삭제 요청</h2>
+<p>설정 페이지에서 플랫폼 연결 해제 및 작품 삭제가 가능합니다. 전체 데이터 삭제를 원하시면 서비스 관리자에게 연락해주세요.</p>
+
+<h2>7. 문의</h2>
+<p>개인정보 관련 문의: musiqcut@gmail.com</p>
 </body>
 </html>
