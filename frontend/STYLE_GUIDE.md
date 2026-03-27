@@ -115,9 +115,48 @@ box-shadow: 0 0 6px var(--success/error/accent);
 animation: gen-pulse 1.5s ease-in-out infinite;
 ```
 
+## 반응형 브레이크포인트
+
+| 구간 | 범위 | 적용 |
+|------|------|------|
+| 모바일 | `max-width: 640px` | 1열 레이아웃, 카드 패딩 `16px` |
+| 태블릿 | `641px ~ 900px` | 2~3열 그리드 |
+| PC | `min-width: 901px` | 풀 레이아웃 |
+
+## 레이아웃 패턴
+
+### 플랫폼 카드 그리드 (`.platform-grid`)
+```css
+display: grid;
+grid-template-columns: 1fr;       /* 기본 1열 */
+gap: 16px;                         /* 카드 그리드 간격 */
+/* 641px+ → repeat(3, 1fr) */
+```
+
+### 플랫폼 카드 (`.platform-card`)
+- 카드 내부 flex column, 설명은 `margin-bottom: auto`로 하단 정렬
+- `.platform-section`: 카드 내 행 구분 (`border-top` + `space-between`)
+
+### 카드 내 행 (`.platform-section`)
+```css
+display: flex;
+align-items: center;
+justify-content: space-between;    /* 라벨 좌측, 버튼/토글 우측 */
+gap: 8px;
+padding-top: 8px;
+margin-top: 8px;
+border-top: 1px solid var(--border);
+```
+
+### 정보 값 (`.info-value`)
+```css
+word-break: break-word;            /* 긴 텍스트 자동 줄바꿈 */
+```
+
 ## 금지 사항
 
 - `background: var(--surface2)` 로 서브요소 분리 → `border` 사용
 - 하드코딩 px 대신 CSS 변수 사용 (radius, font-size)
 - `margin-top`과 `margin-bottom` 혼용 → 한 방향만 (`margin-top` 또는 `margin-bottom`)
 - 같은 레벨 요소에 다른 간격 → 통일된 클래스 사용 (`step-content-block`)
+- 인라인 `style="margin:0"` 등 반복 → CSS 클래스로 처리

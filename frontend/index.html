@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
   <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
-  <link rel="stylesheet" href="/css/style.css?v=1774587000">
+  <link rel="stylesheet" href="/css/style.css?v=1774610000">
 </head>
 <body>
 <div class="app">
@@ -441,63 +441,53 @@
       <!-- ── 채널 연동 ── -->
       <h2 style="font-size:1.1rem;margin:32px 0 12px;color:var(--text-muted)">채널</h2>
 
-      <div class="card">
-        <div class="setting-header">
-          <div>
-            <div class="card-title" style="margin:0">YouTube</div>
-            <div class="setting-desc" id="yt-account-desc">Shorts</div>
+      <div class="platform-grid">
+        <div class="card platform-card">
+          <div class="card-title" style="margin:0">YouTube</div>
+          <div class="setting-desc" id="yt-account-desc">Shorts</div>
+          <div class="platform-section">
+            <span id="yt-status-dot" class="status-dot-label">● 미연결</span>
+            <span id="yt-actions"><button class="btn btn-primary btn-sm" onclick="connectPlatform('youtube')">연결하기</button></span>
           </div>
-          <span id="yt-status-dot" class="status-dot-label">● 미연결</span>
+          <div class="platform-section">
+            <span class="platform-label">자동 업로드</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="auto-upload-youtube" onchange="togglePlatformAutoUpload('youtube', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
-        <div class="setting-header" style="margin-bottom:0">
-          <div class="setting-desc">자동 업로드</div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="auto-upload-youtube" onchange="togglePlatformAutoUpload('youtube', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="setting-actions" id="yt-actions">
-          <button class="btn btn-primary btn-sm" onclick="connectPlatform('youtube')">연결하기</button>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="setting-header">
-          <div>
-            <div class="card-title" style="margin:0">Instagram</div>
-            <div class="setting-desc" id="ig-account-desc">Reels</div>
+        <div class="card platform-card">
+          <div class="card-title" style="margin:0">Instagram</div>
+          <div class="setting-desc" id="ig-account-desc">Reels</div>
+          <div class="platform-section">
+            <span id="ig-status-dot" class="status-dot-label">● 미연결</span>
+            <span id="ig-actions"><button class="btn btn-primary btn-sm" onclick="connectPlatform('instagram')">연결하기</button></span>
           </div>
-          <span id="ig-status-dot" class="status-dot-label">● 미연결</span>
+          <div class="platform-section">
+            <span class="platform-label">자동 업로드</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="auto-upload-instagram" onchange="togglePlatformAutoUpload('instagram', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
-        <div class="setting-header" style="margin-bottom:0">
-          <div class="setting-desc">자동 업로드</div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="auto-upload-instagram" onchange="togglePlatformAutoUpload('instagram', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="setting-actions" id="ig-actions">
-          <button class="btn btn-primary btn-sm" onclick="connectPlatform('instagram')">연결하기</button>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="setting-header">
-          <div>
-            <div class="card-title" style="margin:0">TikTok</div>
-            <div class="setting-desc" id="tt-account-desc">숏폼</div>
+        <div class="card platform-card">
+          <div class="card-title" style="margin:0">TikTok</div>
+          <div class="setting-desc" id="tt-account-desc">숏폼</div>
+          <div class="platform-section">
+            <span id="tt-status-dot" class="status-dot-label">● 미연결</span>
+            <span id="tt-actions"><button class="btn btn-primary btn-sm" onclick="connectPlatform('tiktok')">연결하기</button></span>
           </div>
-          <span id="tt-status-dot" class="status-dot-label">● 미연결</span>
-        </div>
-        <div class="setting-header" style="margin-bottom:0">
-          <div class="setting-desc">자동 업로드</div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="auto-upload-tiktok" onchange="togglePlatformAutoUpload('tiktok', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="setting-actions" id="tt-actions">
-          <button class="btn btn-primary btn-sm" onclick="connectPlatform('tiktok')">연결하기</button>
+          <div class="platform-section">
+            <span class="platform-label">자동 업로드</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="auto-upload-tiktok" onchange="togglePlatformAutoUpload('tiktok', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
       </div>
 
