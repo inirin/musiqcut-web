@@ -477,6 +477,7 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .upload-btn-grid .btn { width: 100%; display: block; text-align: center; font-size: var(--text-xs) !important; padding: 8px 2px !important; box-sizing: border-box; word-break: keep-all; line-height: 1.3; }
 .platform-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.platform-grid .card { margin-bottom: 0; }
 .platform-card { display: flex; flex-direction: column; }
 .platform-card .setting-desc { margin: 0 0 auto; }
 .platform-section {
@@ -808,7 +809,8 @@ pre {
   .res-inline { grid-template-columns: repeat(4, 1fr); }
 }
 @media (min-width: 641px) {
-  .platform-grid { grid-template-columns: repeat(3, 1fr); }
+  .platform-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .platform-grid .card { margin-bottom: 0; }
 }
 @keyframes resFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .res-inline .res-item { min-width: 0; }

@@ -128,10 +128,11 @@ animation: gen-pulse 1.5s ease-in-out infinite;
 ### 플랫폼 카드 그리드 (`.platform-grid`)
 ```css
 display: grid;
-grid-template-columns: 1fr;       /* 기본 1열 */
+grid-template-columns: 1fr;       /* 기본 1열 (모바일) */
 gap: 16px;                         /* 카드 그리드 간격 */
 /* 641px+ → repeat(3, 1fr) */
 ```
+- **중요**: grid 안의 `.card`는 `margin-bottom: 0` (gap과 margin 합산 방지)
 
 ### 플랫폼 카드 (`.platform-card`)
 - 카드 내부 flex column, 설명은 `margin-bottom: auto`로 하단 정렬
