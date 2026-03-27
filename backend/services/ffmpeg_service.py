@@ -11,8 +11,8 @@ TARGET_H = 1280
 
 # 폰트 경로
 _FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-FONT_TITLE = str(_FONTS_DIR / "GmarketSansTTFBold.ttf")
-FONT_LYRICS = str(_FONTS_DIR / "NanumSquareBold.ttf")
+FONT_TITLE = str(_FONTS_DIR / "AggroB.ttf")
+FONT_LYRICS = str(_FONTS_DIR / "Cafe24Danjunghae.ttf")
 
 
 def _wrap_words(text: str, max_words: int = 4) -> str:
@@ -127,11 +127,12 @@ def _generate_ass(scenes: list, out_path: Path,
         # 아랫줄 가득 참 → 윗줄로 즉시 이동 + 아랫줄 리셋
         if bcount >= WPL:
             _close(0, ws)                   # 윗줄 이전 내용 마감
-            # fade-out 중인 이전 Top 세그먼트가 현재 시점 넘으면 잘라내기
-            if slot_segs[0] and slot_segs[0][-1][1] > ws:
-                prev = slot_segs[0][-1]
-                slot_segs[0][-1] = (prev[0], ws, prev[2], False)
-            _close(1, ws)                   # 아랫줄 마감
+            # 이전 Top 세그먼트 중 현재 시점과 겹치는 것 모두 잘라내기 (3줄 방지)
+            for _si in range(len(slot_segs[0])):
+                _seg = slot_segs[0][_si]
+                if _seg[1] >= ws:
+                    slot_segs[0][_si] = (_seg[0], ws - 0.01, _seg[2], False)
+            _close(1, ws - 0.01)            # 아랫줄 마감 (1프레임 앞당겨 겹침 방지)
             slot_text[0] = bottom           # 아랫줄 텍스트를 윗줄에 즉시 표시
             slot_start[0] = ws
             top_lws = bottom_lws
@@ -175,9 +176,9 @@ def _generate_ass(scenes: list, out_path: Path,
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        "Style: Top,NanumSquareOTFB00,48,&H00FFFFFF,&H000000FF,"
-        "&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,10,10,375,1\n"
-        "Style: Bottom,NanumSquareOTFB00,48,&H00FFFFFF,&H000000FF,"
+        "Style: Top,Cafe24 Danjunghae,40,&H00FFFFFF,&H000000FF,"
+        "&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,10,10,380,1\n"
+        "Style: Bottom,Cafe24 Danjunghae,40,&H00FFFFFF,&H000000FF,"
         "&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,10,10,320,1\n"
         "\n"
         "[Events]\n"
@@ -389,7 +390,7 @@ async def render_video(
         fade_start = 2.7
         fade_end = 3.0
         title_common = (
-            f":fontcolor=#FFF700"
+            f":fontcolor=white"
             f":borderw={border_w}:bordercolor=black@0.8"
             f":shadowx=3:shadowy=3:shadowcolor=black@0.5"
             f":enable='between(t,0,{fade_end})'"
@@ -457,7 +458,7 @@ async def render_video(
         theme_bw = max(2, theme_fs // 16)
         theme_y = 180 + len(title_lines) * (title_fs + 6) + 10
         theme_common = (
-            f":fontcolor=white"
+            f":fontcolor=#FFF700"
             f":borderw={theme_bw}:bordercolor=black@0.6"
             f":shadowx=1:shadowy=1:shadowcolor=black@0.4"
             f":enable='between(t,0,{fade_end})'"
