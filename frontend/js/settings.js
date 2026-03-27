@@ -41,6 +41,58 @@ async function loadSettings() {
     }
   } catch {}
 
+  // 플랫폼 연동 상태 로드
+  _loadAllPlatformSettings();
+}
+
+async function _loadAllPlatformSettings() {
+  const platforms = [
+    { key: 'youtube', dot: 'yt-status-dot', desc: 'yt-account-desc', actions: 'yt-actions',
+      label: 'YouTube Shorts', endpoint: '/upload/account' },
+    { key: 'instagram', dot: 'ig-status-dot', desc: 'ig-account-desc', actions: 'ig-actions',
+      label: 'Instagram Reels', endpoint: '/upload/instagram/account' },
+    { key: 'tiktok', dot: 'tt-status-dot', desc: 'tt-account-desc', actions: 'tt-actions',
+      label: 'TikTok', endpoint: '/upload/tiktok/account' },
+  ];
+
+  for (const p of platforms) {
+    try {
+      const data = await API.get(p.endpoint);
+      const dot = document.getElementById(p.dot);
+      const desc = document.getElementById(p.desc);
+      const actions = document.getElementById(p.actions);
+      if (desc) desc.textContent = `작품을 ${p.label}로 업로드합니다`;
+      if (data.connected) {
+        if (dot) { dot.textContent = `● ${data.channel_title} 연결됨`; dot.style.color = 'var(--success)'; }
+        if (actions) actions.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="disconnectPlatform('${p.key}')">연결 해제</button>`;
+      } else {
+        if (dot) { dot.textContent = '● 미연결'; dot.style.color = 'var(--text-muted)'; }
+        if (actions) actions.innerHTML = `<button class="btn btn-primary btn-sm" onclick="connectPlatform('${p.key}')">연결하기</button>`;
+      }
+    } catch {}
+  }
+
+  // 플랫폼별 자동 업로드 토글
+  try {
+    const autoData = await API.get('/upload/auto-upload');
+    for (const p of ['youtube', 'instagram', 'tiktok']) {
+      const toggle = document.getElementById(`auto-upload-${p}`);
+      if (toggle) toggle.checked = !!autoData[p];
+    }
+  } catch {}
+}
+
+// 하위 호환
+function _loadYouTubeSettings() { _loadAllPlatformSettings(); }
+
+async function togglePlatformAutoUpload(platform, enabled) {
+  try {
+    await fetch(`/api/upload/auto-upload/${platform}?enabled=${enabled}`, { method: 'POST' });
+    const label = {youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok'}[platform];
+    showToast(`${label} 자동 업로드 ${enabled ? '활성화' : '비활성화'}`, 'success');
+  } catch (e) {
+    showToast('설정 변경 실패', 'error');
+  }
 }
 
 function setPlaceholder(id, text) {

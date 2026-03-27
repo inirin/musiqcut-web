@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from backend.database import init_db
-from backend.routers import projects, pipeline, test, keys, system, feedback
+from backend.routers import projects, pipeline, test, keys, system, feedback, upload
 
 
 class HtmlNoCacheMiddleware(BaseHTTPMiddleware):
@@ -58,6 +58,7 @@ app.include_router(test.router, prefix="/api/test", tags=["test"])
 app.include_router(keys.router, prefix="/api/keys", tags=["keys"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 
 # 정적 파일 서빙
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")

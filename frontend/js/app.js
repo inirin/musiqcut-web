@@ -338,6 +338,8 @@ function showPage(name, skipHash) {
   if (name !== 'result') stopResourceMonitor();
   document.querySelectorAll('[data-page]').forEach(el => {
     el.classList.toggle('hidden', el.dataset.page !== name);
+    // 전환된 페이지는 스크롤 맨 위로
+    if (el.dataset.page === name) el.scrollTop = 0;
   });
   document.querySelectorAll('nav a').forEach(a => {
     a.classList.toggle('active', a.dataset.nav === name);
@@ -411,7 +413,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (hash.startsWith('result/')) {
     window._currentProjectId = hash.split('/')[1];
     showPage('result');
-  } else if (['guide', 'settings'].includes(hash)) {
+  } else if (['guide', 'channel', 'settings'].includes(hash)) {
     showPage(hash);
   } else {
     showPage('dashboard');

@@ -7,6 +7,18 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     imagen_api_keys: str = ""  # 쉼표 구분 복수 키 (예: "key1,key2,key3")
 
+    youtube_client_id: str = ""
+    youtube_client_secret: str = ""
+    youtube_redirect_uri: str = "http://localhost:8000/api/upload/youtube/callback"
+
+    instagram_app_id: str = ""
+    instagram_app_secret: str = ""
+    instagram_redirect_uri: str = "http://localhost:8000/api/upload/instagram/callback"
+
+    tiktok_client_key: str = ""
+    tiktok_client_secret: str = ""
+    tiktok_redirect_uri: str = "http://localhost:8000/api/upload/tiktok/callback"
+
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     debug: bool = True

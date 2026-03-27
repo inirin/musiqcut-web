@@ -1,3 +1,116 @@
+// ── 업로드 ──────────────────────────────────────
+function _goConnectPlatform(label) {
+  alert('설정에서 ' + label + ' 계정을 연결해주세요');
+  showPage('settings');
+  // 해당 플랫폼 카드로 스크롤
+  const map = {YouTube:'yt',Instagram:'ig',TikTok:'tt'};
+  const prefix = map[label];
+  if (prefix) {
+    setTimeout(() => {
+      const el = document.getElementById(prefix + '-status-dot');
+      if (el) el.closest('.card').scrollIntoView({behavior:'smooth', block:'center'});
+    }, 100);
+  }
+}
+
+// ── 업로드 버튼 (멀티 플랫폼) ───────────────────
+const _PLATFORMS = [
+  { key: 'youtube', label: 'YouTube', icon: '▶' },
+  { key: 'instagram', label: 'Instagram', icon: '▶' },
+  { key: 'tiktok', label: 'TikTok', icon: '▶' },
+];
+
+async function _loadUploadButtons(projectId) {
+  const container = document.getElementById('upload-buttons');
+  if (!container) return;
+
+  try {
+    const [ytAcct, igAcct, ttAcct, statusData] = await Promise.all([
+      fetch('/api/upload/account').then(r => r.json()),
+      fetch('/api/upload/instagram/account').then(r => r.json()),
+      fetch('/api/upload/tiktok/account').then(r => r.json()),
+      fetch(`/api/upload/${projectId}/status`).then(r => r.json()),
+    ]);
+
+    const accounts = { youtube: ytAcct, instagram: igAcct, tiktok: ttAcct };
+    const uploads = statusData.uploads || [];
+    // 다운로드는 HTML에서 별도 렌더링
+    const dlBtn = document.getElementById('result-download');
+    if (dlBtn) dlBtn.href = `/storage/projects/${projectId}/video/final.mp4`;
+    let html = '';
+    let hasAny = false;
+
+    for (const p of _PLATFORMS) {
+      hasAny = true;
+      const connected = accounts[p.key].connected;
+      const u = connected
+        ? (uploads.find(u => u.platform === p.key && u.status !== 'failed') ||
+           uploads.find(u => u.platform === p.key))
+        : null;
+
+      if (!connected) {
+        html += `<button type="button" class="btn btn-secondary upload-not-connected" data-platform="${p.label}" style="opacity:0.6">${p.label}<br>업로드</button>`;
+      } else if (_uploadingPlatforms.has(p.key)) {
+        html += `<button type="button" class="btn btn-secondary" disabled>${p.label}<br>⏳ 업로드 중</button>`;
+      } else if (u && u.status === 'done') {
+        html += `<a href="${u.platform_url}" target="_blank" rel="noopener" class="btn btn-secondary">✅ ${p.label}<br>업로드됨</a>`;
+      } else if (u && u.status === 'uploading') {
+        html += `<button type="button" class="btn btn-secondary" disabled>${p.label}<br>⏳ 업로드 중</button>`;
+      } else if (u && u.status === 'failed') {
+        html += `<button type="button" class="btn btn-secondary upload-action" data-pid="${projectId}" data-platform="${p.key}">${p.label}<br>🔄 재시도</button>`;
+      } else {
+        html += `<button type="button" class="btn btn-secondary upload-action" data-pid="${projectId}" data-platform="${p.key}">${p.label}<br>업로드</button>`;
+      }
+    }
+
+    if (uploads.some(u => u.status === 'uploading')) {
+      setTimeout(() => _loadUploadButtons(projectId), 3000);
+    }
+
+    container.innerHTML = hasAny ? html : '';
+
+    // 이벤트 바인딩 — 미연결
+    container.querySelectorAll('.upload-not-connected').forEach(btn => {
+      btn.addEventListener('click', () => _goConnectPlatform(btn.dataset.platform));
+    });
+    // 이벤트 바인딩 — 업로드/재시도
+    container.querySelectorAll('.upload-action').forEach(btn => {
+      btn.addEventListener('click', () => _uploadToPlatform(btn.dataset.pid, btn.dataset.platform));
+    });
+  } catch (e) {
+    console.error('_loadUploadButtons error:', e);
+    container.innerHTML = '';
+  }
+}
+
+let _uploadingPlatforms = new Set();
+
+async function _uploadToPlatform(projectId, platform) {
+  if (_uploadingPlatforms.has(platform)) return;
+  const label = _PLATFORMS.find(p => p.key === platform)?.label || platform;
+  if (!confirm(`${label}에 이 작품을 업로드하시겠습니까?`)) return;
+
+  _uploadingPlatforms.add(platform);
+  _loadUploadButtons(projectId);
+
+  try {
+    const res = await fetch(`/api/upload/${projectId}/upload/${platform}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`${label} 업로드를 시작합니다`, 'success');
+      setTimeout(() => { _uploadingPlatforms.delete(platform); _loadUploadButtons(projectId); }, 3000);
+    } else {
+      showToast(data.error || '업로드 실패', 'error');
+      _uploadingPlatforms.delete(platform);
+      _loadUploadButtons(projectId);
+    }
+  } catch (e) {
+    showToast('업로드 요청 실패', 'error');
+    _uploadingPlatforms.delete(platform);
+    _loadUploadButtons(projectId);
+  }
+}
+
 // ── 공통 유틸 ─────────────────────────────────
 const _NON_VOCAL = NON_VOCAL; // app.js 전역 참조
 
@@ -216,10 +329,11 @@ function handlePipelineEvent(evt) {
     const id = window._currentProjectId;
     const videoUrl = `/storage/projects/${id}/video/final.mp4`;
     document.getElementById('result-video').src = videoUrl + `?t=${Date.now()}`;
-    document.getElementById('result-download').href = videoUrl;
+    // result-download는 upload-buttons 그리드 안에서 렌더링
     document.getElementById('result-video-card')?.classList.remove('hidden');
     document.getElementById('result-title').textContent = '완성!';
     document.getElementById('result-status').innerHTML = statusBadge('done');
+    _loadUploadButtons(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

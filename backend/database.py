@@ -44,6 +44,34 @@ async def init_db():
                 created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS platform_accounts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform        TEXT NOT NULL DEFAULT 'youtube',
+                channel_id      TEXT,
+                channel_title   TEXT,
+                access_token    TEXT,
+                refresh_token   TEXT,
+                token_expires_at DATETIME,
+                scope           TEXT,
+                connected_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS uploads (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id      TEXT REFERENCES projects(id),
+                platform        TEXT NOT NULL DEFAULT 'youtube',
+                platform_video_id TEXT,
+                platform_url    TEXT,
+                title           TEXT,
+                description     TEXT,
+                tags            TEXT,
+                status          TEXT DEFAULT 'pending',
+                uploaded_at     DATETIME,
+                error_msg       TEXT,
+                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS auto_schedule (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 schedule_type   TEXT DEFAULT 'generation',

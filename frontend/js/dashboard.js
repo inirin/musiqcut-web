@@ -132,9 +132,10 @@ async function loadResult() {
     if (videoOk) {
       if (_lastLoadedProjectId !== id || videoCard.classList.contains('hidden')) {
         videoEl.src = videoUrl + `?t=${Date.now()}`;
-        document.getElementById('result-download').href = videoUrl;
+        // result-download는 upload-buttons 그리드 안에서 렌더링
       }
       videoCard.classList.remove('hidden');
+      if (typeof _loadUploadButtons === 'function') _loadUploadButtons(id);
       if (typeof loadFeedbackList === 'function') loadFeedbackList(id);
     } else {
       videoCard.classList.add('hidden');

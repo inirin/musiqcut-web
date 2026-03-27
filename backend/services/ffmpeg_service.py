@@ -353,7 +353,7 @@ async def render_video(
             f":fontsize={title_fs}:fontcolor=#FFF700"
             f":borderw={border_w}:bordercolor=black@0.8"
             f":shadowx=3:shadowy=3:shadowcolor=black@0.5"
-            f":x=(w-text_w)/2:y=80"
+            f":x=(w-text_w)/2:y=130"
             f":enable='between(t,0,{fade_end})'"
             f":alpha='if(gt(t,{fade_start}),max(({fade_end}-t)/{fade_end - fade_start},0),1)'"
         )
@@ -413,7 +413,7 @@ async def render_video(
         longest_w = max(_est_w(l) for l in theme_lines)
         theme_fs = min(80, max(32, int(max_w / max(longest_w, 1))))
         theme_bw = max(2, theme_fs // 16)
-        theme_y = 80 + title_fs + 10
+        theme_y = 130 + title_fs + 10
         theme_common = (
             f":fontcolor=white"
             f":borderw={theme_bw}:bordercolor=black@0.6"
