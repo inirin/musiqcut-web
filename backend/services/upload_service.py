@@ -42,7 +42,7 @@ async def get_upload_history(limit: int = 50) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def generate_metadata(title: str, theme: str) -> dict:
+def generate_metadata(title: str, theme: str, project_id: str = None) -> dict:
     """업로드용 제목/설명/태그 자동 생성."""
     # 테마에서 설명 부분 추출
     desc_part = theme
@@ -51,16 +51,37 @@ def generate_metadata(title: str, theme: str) -> dict:
             desc_part = theme.split(sep, 1)[1].strip()
             break
 
-    upload_title = f"{title} - {desc_part}"[:100]
+    upload_title = f"{title}\n{desc_part}"[:100]
+    # YouTube는 제목 줄바꿈 미지원 → 하이픈 구분자 버전도 제공
+    upload_title_flat = f"{title} - {desc_part}"[:100]
+
+    # lyrics.json에서 해시태그 로드
+    hashtags = []
+    if project_id:
+        try:
+            from backend.utils.file_manager import lyrics_path
+            lp = lyrics_path(project_id)
+            if lp.exists():
+                data = json.loads(lp.read_text(encoding="utf-8"))
+                hashtags = data.get("hashtags", [])
+        except Exception:
+            pass
+
+    # 해시태그가 없으면 기본 태그 사용
+    if not hashtags:
+        hashtags = ["#뮤직컷", "#AI뮤직비디오", "#Shorts", "#AI", "#MusicVideo"]
+
+    hashtag_line = " ".join(hashtags)
 
     description = (
         f"{desc_part}\n\n"
         f"세상 모든 것을 노래합니다.\n\n"
-        f"#뮤직컷 #AI뮤직비디오 #Shorts #AI #MusicVideo"
+        f"{hashtag_line}"
     )
 
-    tags = ["뮤직컷", "AI뮤직비디오", "AI", "Shorts", "숏츠", "뮤직비디오"]
-    return {"title": upload_title, "description": description, "tags": tags}
+    # YouTube tags (# 제거)
+    tags = [h.lstrip("#") for h in hashtags]
+    return {"title": upload_title, "title_flat": upload_title_flat, "description": description, "tags": tags}
 
 
 async def create_and_execute_upload(
@@ -100,8 +121,12 @@ async def create_and_execute_upload(
             return {"ok": False, "error": f"이미 {platform}에 업로드된 작품입니다"}
 
     # 메타데이터 생성
-    meta = generate_metadata(project["title"], project["theme"])
-    title = custom_title or meta["title"]
+    meta = generate_metadata(project["title"], project["theme"], project_id)
+    # YouTube는 제목 줄바꿈 미지원 → title_flat 사용
+    if platform == "youtube":
+        title = custom_title or meta["title_flat"]
+    else:
+        title = custom_title or meta["title"]
     description = custom_description or meta["description"]
     tags = meta["tags"]
 

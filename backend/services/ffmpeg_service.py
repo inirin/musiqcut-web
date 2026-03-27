@@ -337,26 +337,74 @@ async def render_video(
     # 7b. 제목 (Gmarket Sans Bold, 상단, 0~3초 + fade-out only)
     if title:
         font_escaped = FONT_TITLE.replace('\\', '/').replace(':', r'\:')
-        title_safe = title.replace("\\", "\\\\").replace("'", "\u2019").replace(":", "\\:")
+
+        def _escape_dt(t):
+            return t.replace("\\", "\\\\").replace("'", "\u2019").replace(":", "\\:")
+
+        def _est_w(t):
+            return sum(0.9 if ord(c) > 127 else 0.5 for c in t)
+
         # 제목 길이에 따라 폰트 크기 가변 (양쪽 여백 40px 확보)
         max_w = TARGET_W - 80  # 656px 사용 가능 영역
-        # 한글 ~0.9em, 영문 ~0.5em 기준 추정 폭
-        est_width = sum(0.9 if ord(c) > 127 else 0.5 for c in title_safe)
-        title_fs = min(88, max(48, int(max_w / max(est_width, 1))))
+
+        # 줄 수 결정 — 폰트 48px 이상 될 때까지 줄 수 늘림
+        MIN_TITLE_FS = 48
+        words = title.split()
+        title_lines = [title]
+
+        for num_lines in range(1, min(len(words), 3) + 1):
+            if num_lines == 1:
+                title_lines = [title]
+            else:
+                title_lines = []
+                remaining = list(words)
+                for li in range(num_lines):
+                    lines_left = num_lines - li
+                    total_rem = _est_w(' '.join(remaining))
+                    target = total_rem / lines_left
+                    accum = 0
+                    cut = len(remaining)
+                    for wi, wd in enumerate(remaining):
+                        accum += _est_w(wd) + (0.5 if wi < len(remaining) - 1 else 0)
+                        if accum >= target and wi > 0:
+                            cut = wi + 1
+                            break
+                    if li == num_lines - 1:
+                        cut = len(remaining)
+                    title_lines.append(' '.join(remaining[:cut]))
+                    remaining = remaining[cut:]
+                if remaining:
+                    title_lines[-1] += ' ' + ' '.join(remaining)
+
+            longest_w = max(_est_w(l) for l in title_lines)
+            fs = int(max_w / max(longest_w, 1))
+            if fs >= MIN_TITLE_FS:
+                break
+
+        # 최종 폰트 크기 (최대 88)
+        longest_w = max(_est_w(l) for l in title_lines)
+        title_fs = min(88, max(48, int(max_w / max(longest_w, 1))))
         border_w = max(3, title_fs // 16)
         # 0~2.7초 완전 표시, 2.7~3.0초 fade-out
         fade_start = 2.7
         fade_end = 3.0
-        vf_parts.append(
-            f"drawtext=fontfile='{font_escaped}'"
-            f":text='{title_safe}'"
-            f":fontsize={title_fs}:fontcolor=#FFF700"
+        title_common = (
+            f":fontcolor=#FFF700"
             f":borderw={border_w}:bordercolor=black@0.8"
             f":shadowx=3:shadowy=3:shadowcolor=black@0.5"
-            f":x=(w-text_w)/2:y=130"
             f":enable='between(t,0,{fade_end})'"
             f":alpha='if(gt(t,{fade_start}),max(({fade_end}-t)/{fade_end - fade_start},0),1)'"
         )
+
+        for li, line in enumerate(title_lines):
+            y = 180 + li * (title_fs + 6)
+            vf_parts.append(
+                f"drawtext=fontfile='{font_escaped}'"
+                f":text='{_escape_dt(line)}'"
+                f":fontsize={title_fs}"
+                f":x=(w-text_w)/2:y={y}"
+                + title_common
+            )
 
     # 7c. 테마 (제목 아래, 노란색, 가변 크기, 길면 2줄)
     if theme and title:
@@ -367,12 +415,6 @@ async def render_video(
                 break
         else:
             theme_display = theme
-
-        def _escape_dt(t):
-            return t.replace("\\", "\\\\").replace("'", "\u2019").replace(":", "\\:")
-
-        def _est_w(t):
-            return sum(0.9 if ord(c) > 127 else 0.5 for c in t)
 
         # 1) 줄 수 결정 — 폰트 40px 이상 될 때까지 줄 수 늘림
         MIN_THEME_FS = 40
@@ -389,7 +431,7 @@ async def render_video(
                 for li in range(num_lines):
                     lines_left = num_lines - li
                     total_rem = _est_w(' '.join(remaining))
-                    target = total_rem / lines_left * (1.05 if li == 0 else 1.0)
+                    target = total_rem / lines_left
                     accum = 0
                     cut = len(remaining)
                     for wi, wd in enumerate(remaining):
@@ -413,7 +455,7 @@ async def render_video(
         longest_w = max(_est_w(l) for l in theme_lines)
         theme_fs = min(80, max(32, int(max_w / max(longest_w, 1))))
         theme_bw = max(2, theme_fs // 16)
-        theme_y = 130 + title_fs + 10
+        theme_y = 180 + len(title_lines) * (title_fs + 6) + 10
         theme_common = (
             f":fontcolor=white"
             f":borderw={theme_bw}:bordercolor=black@0.6"

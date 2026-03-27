@@ -71,6 +71,41 @@ async def create_project(body: ProjectCreate):
     return {"id": project_id}
 
 
+@router.post("/{project_id}/hashtags")
+async def generate_project_hashtags(project_id: str):
+    """기존 작품에 대해 해시태그를 생성하여 lyrics.json에 저장."""
+    import json
+    from backend.utils.file_manager import lyrics_path
+    from backend.services.gemini_script_service import generate_hashtags
+
+    lp = lyrics_path(project_id)
+    if not lp.exists():
+        raise HTTPException(404, "lyrics.json이 없습니다 (Step 1 미완료)")
+
+    data = json.loads(lp.read_text(encoding="utf-8"))
+
+    # 프로젝트 정보 조회
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        row = await (await db.execute(
+            "SELECT theme, mood FROM projects WHERE id=?", (project_id,)
+        )).fetchone()
+    if not row:
+        raise HTTPException(404, "프로젝트를 찾을 수 없습니다")
+
+    hashtags = await generate_hashtags(
+        title=data.get("title", ""),
+        theme=dict(row)["theme"],
+        mood=dict(row).get("mood", ""),
+        lyrics=data.get("lyrics", ""),
+        art_style=data.get("art_style", ""),
+    )
+
+    data["hashtags"] = hashtags
+    lp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"hashtags": hashtags}
+
+
 @router.delete("/{project_id}")
 async def delete_project(project_id: str):
     # 파일 삭제

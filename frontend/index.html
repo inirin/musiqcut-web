@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
   <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
-  <link rel="stylesheet" href="/css/style.css?v=1774585200">
+  <link rel="stylesheet" href="/css/style.css?v=1774587000">
 </head>
 <body>
 <div class="app">
@@ -91,7 +91,11 @@
       <!-- 작품 정보 -->
       <div class="card">
         <div class="card-title">작품 정보</div>
-        <div class="info-item step-content-block">
+        <div class="info-item step-content-block" style="cursor:pointer" onclick="_copyVideoTitle()" title="클릭하여 복사">
+          <span class="info-label">제목</span>
+          <span id="result-video-title" class="info-value"></span>
+        </div>
+        <div class="info-item step-content-block" style="display:none">
           <span class="info-label">테마</span><span id="result-theme" class="info-value"></span>
         </div>
         <div class="project-meta-row step-content-block">
@@ -100,6 +104,10 @@
             <div id="result-art-style" class="step1-char-desc step1-collapse" onclick="this.classList.toggle('open')"></div>
           </div>
           <div id="project-inspired" style="display:none"></div>
+        </div>
+        <div class="info-item step-content-block" id="result-hashtags-row" style="display:none">
+          <span class="info-label"># <button class="btn btn-sm" onclick="_generateHashtags()" id="hashtag-gen-btn" title="해시태그 (재)생성" style="margin-left:6px">(재)생성</button></span>
+          <span id="result-hashtags" class="info-value" style="cursor:pointer;line-height:1.6" onclick="_selectHashtags()" title="클릭하여 선택"></span>
         </div>
         <div class="info-grid step-content-block">
           <div class="info-item">
@@ -575,12 +583,12 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=1774585200"></script>
-<script src="/js/dashboard.js?v=1774585200"></script>
-<script src="/js/pipeline.js?v=1774585200"></script>
-<script src="/js/feedback.js?v=1774585200"></script>
-<script src="/js/channel.js?v=1774585200"></script>
-<script src="/js/settings.js?v=1774585200"></script>
+<script src="/js/app.js?v=1774587000"></script>
+<script src="/js/dashboard.js?v=1774587000"></script>
+<script src="/js/pipeline.js?v=1774587000"></script>
+<script src="/js/feedback.js?v=1774587000"></script>
+<script src="/js/channel.js?v=1774587000"></script>
+<script src="/js/settings.js?v=1774587000"></script>
 
 </body>
 </html>

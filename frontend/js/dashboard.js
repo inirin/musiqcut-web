@@ -100,6 +100,23 @@ async function loadResult() {
   // 기본 정보
   document.getElementById('result-title').textContent = project.title || project.theme;
   document.getElementById('result-theme').textContent = project.theme || '';
+  // 해시태그 리셋 (프로젝트 전환 시)
+  const _hashRow = document.getElementById('result-hashtags-row');
+  if (_hashRow) _hashRow.style.display = 'none';
+  const _hashEl = document.getElementById('result-hashtags');
+  if (_hashEl) _hashEl.textContent = '';
+  // 영상 제목 (제목 + 줄바꿈 + 테마설명)
+  const _theme = project.theme || '';
+  let _descPart = _theme;
+  for (const sep of [' - ', ' — ', ' – ']) {
+    if (_theme.includes(sep)) { _descPart = _theme.split(sep).slice(1).join(sep).trim(); break; }
+  }
+  const titleEl = document.getElementById('result-video-title');
+  titleEl.innerHTML = '';
+  titleEl.appendChild(document.createTextNode(project.title || ''));
+  titleEl.appendChild(document.createElement('br'));
+  titleEl.appendChild(document.createTextNode(_descPart));
+  window._currentVideoTitle = `${project.title || ''}\n${_descPart}`;
   // 트렌드 영감 — mood에서 [트렌드 힌트: ...] 파싱 (자동 생성만)
   const inspiredEl = document.getElementById('project-inspired');
   const hintMatch = (project.mood || '').match(/\[트렌드 힌트:\s*(.+?)\]$/);
@@ -170,6 +187,8 @@ async function loadResult() {
           if (artEl && !artEl.textContent && lyricsData.art_style) {
             artEl.textContent = lyricsData.art_style;
           }
+          // 해시태그 표시
+          _renderHashtags(lyricsData.hashtags);
           // 캐릭터/보컬 — Step 1에 표시
           const metaEl = document.getElementById('step-1-meta');
           if (metaEl && !metaEl.innerHTML.trim()) {
@@ -283,6 +302,46 @@ async function abortPipeline() {
 function _updateAbortButton(isRunning) {
   const btn = document.getElementById('abort-pipeline-btn');
   if (btn) btn.classList.toggle('hidden', !isRunning);
+}
+
+// ── 해시태그 ──────────────────────────────────────
+function _renderHashtags(hashtags) {
+  const row = document.getElementById('result-hashtags-row');
+  const el = document.getElementById('result-hashtags');
+  if (!row || !el) return;
+  // Step 1 완료된 작품이면 항상 행 표시 (해시태그 없어도 생성 버튼 노출)
+  row.style.display = '';
+  if (hashtags && hashtags.length) {
+    el.textContent = hashtags.join(' ');
+  } else {
+    el.textContent = '';
+  }
+}
+
+async function _generateHashtags() {
+  const id = window._currentProjectId;
+  if (!id) return;
+  const btn = document.getElementById('hashtag-gen-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '생성 중...'; }
+  try {
+    const res = await API.post(`/projects/${id}/hashtags`, {});
+    _renderHashtags(res.hashtags);
+    toast('해시태그 생성 완료', 'success');
+  } catch (e) {
+    toast(`해시태그 생성 실패: ${e.message}`, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '(재)생성'; }
+  }
+}
+
+function _selectHashtags() {
+  const el = document.getElementById('result-hashtags');
+  if (!el) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 async function deleteProject() {

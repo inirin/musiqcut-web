@@ -1,3 +1,14 @@
+// ── 영상 제목 복사 ──────────────────────────────
+function _copyVideoTitle() {
+  const el = document.getElementById('result-video-title');
+  if (!el) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 // ── 업로드 ──────────────────────────────────────
 function _goConnectPlatform(label) {
   alert('설정에서 ' + label + ' 계정을 연결해주세요');

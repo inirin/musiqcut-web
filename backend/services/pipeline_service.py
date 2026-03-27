@@ -906,17 +906,13 @@ async def _run_pipeline_steps(
         await emitter.update(5, "done", "영상 합성 완료!")
         await emitter.complete(final_video)
 
-        # 자동 업로드 (source='auto' 작품만)
-        try:
-            from backend.services.upload_service import auto_upload_if_configured
-            async with aiosqlite.connect(DB_PATH) as _db:
-                _row = await (await _db.execute(
-                    "SELECT source FROM projects WHERE id=?", (project_id,)
-                )).fetchone()
-                if _row and _row[0] == 'auto':
-                    await auto_upload_if_configured(project_id)
-        except Exception as _e:
-            print(f"[Pipeline] 자동 업로드 스킵: {_e}", file=sys.stderr)
+        # 자동 업로드 (신규 작품만 — resume_from이 0일 때)
+        if resume_from == 0:
+            try:
+                from backend.services.upload_service import auto_upload_if_configured
+                await auto_upload_if_configured(project_id)
+            except Exception as _e:
+                print(f"[Pipeline] 자동 업로드 스킵: {_e}", file=sys.stderr)
 
     except (_PipelineAbortError, _ComfyAbortError, _ImageAbortError):
         # 중단 요청 — 프로젝트 + 현재 스텝을 failed로 마킹

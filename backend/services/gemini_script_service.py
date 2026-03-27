@@ -68,6 +68,13 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 - **절대 금지: 실사(photorealistic), 사진(photograph), 하이퍼리얼리즘, semi-realistic** — 이 프로젝트는 2D/3D 애니메이션 뮤직비디오 전용. 트렌드 힌트에 실존 인물이 있어도 반드시 애니메이션/일러스트 스타일로
 - 선택한 스타일을 art_style 필드에 영문으로 구체적으로 명시하세요 (이 스타일이 모든 장면에 일관 적용됩니다)
 
+해시태그:
+- 이 작품을 YouTube/TikTok/Instagram 숏폼 채널에 업로드할 때 사용할 해시태그를 10~15개 생성하세요
+- 한국어 + 영어 혼합 (한국어 70%, 영어 30%)
+- 카테고리: 테마/소재 키워드, 장르, 분위기, 아트스타일, 트렌드 태그
+- 예: #AI뮤직비디오 #애니메이션 #숏폼 #MusicVideo 등 범용 태그도 3~4개 포함
+- 각 해시태그는 #으로 시작
+
 영상 연출 참고 (가사에 반영):
 - 이 가사는 위 아트 스타일의 뮤지컬 애니메이션이 됩니다
 - 감정 표현이 풍부한 캐릭터 연기가 가능한 가사가 좋습니다
@@ -112,7 +119,8 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
       "name": "캐릭터 이름/별칭 (한국어)",
       "description_en": "3D animated character, female, early 20s, shoulder-length wavy chestnut brown hair with side-swept bangs, bright green eyes, fair skin, slim slender build, average height, narrow shoulders, long neck, wearing a yellow sundress with white sneakers, small star-shaped earring on left ear"
     }}
-  ]
+  ],
+  "hashtags": ["#해시태그1", "#해시태그2", "...최대 15개"]
 }}
 
 중요: scenes 필드는 포함하지 마세요. 장면 구성은 음악 생성 후 별도로 진행됩니다."""
@@ -239,7 +247,43 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         "vocal_style": data.get("vocal_style", ""),
         "art_style": data.get("art_style", "Pixar-style 3D animation"),
         "characters": data.get("characters", []),
+        "hashtags": data.get("hashtags", []),
     }
+
+
+HASHTAG_PROMPT = """아래 작품 정보를 보고 YouTube/TikTok/Instagram 숏폼 업로드용 해시태그를 10~15개 생성하세요.
+반드시 JSON 형식으로만 응답하세요.
+
+작품 정보:
+- 제목: {title}
+- 테마: {theme}
+- 분위기: {mood}
+- 가사: {lyrics}
+- 아트 스타일: {art_style}
+
+해시태그 규칙:
+- 한국어 + 영어 혼합 (한국어 70%, 영어 30%)
+- 카테고리: 테마/소재 키워드, 장르, 분위기, 아트스타일, 트렌드 태그
+- #AI뮤직비디오 #애니메이션 #숏폼 #MusicVideo 등 범용 태그 3~4개 포함
+- 각 해시태그는 #으로 시작
+
+출력 형식:
+{{"hashtags": ["#태그1", "#태그2", "..."]}}"""
+
+
+async def generate_hashtags(title: str, theme: str, mood: str,
+                            lyrics: str, art_style: str) -> list[str]:
+    """기존 작품에 대해 해시태그만 별도 생성."""
+    prompt = HASHTAG_PROMPT.format(
+        title=title, theme=theme, mood=mood,
+        lyrics=lyrics[:500], art_style=art_style,
+    )
+    response = await gemini_generate(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+    data = _parse_json(response.text)
+    return data.get("hashtags", [])
 
 
 async def generate_scenes(title: str, lyrics: str, mood: str,
