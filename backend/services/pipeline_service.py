@@ -710,13 +710,27 @@ async def _run_pipeline_steps(
             # Wan 대상 인덱스 (wide shots)
             wan_indices = [i for i in range(len(scenes)) if i not in s2v_indices]
 
+            # 기존 클립 파일이 있으면 미리 채움 (재생성 시 다른 클립이 pending 안 되도록)
+            clip_files = [None] * len(scenes)
+            for _ci, _sc in enumerate(scenes):
+                _cp = clip_path(project_id, _sc.scene_no)
+                if _cp.exists():
+                    clip_files[_ci] = str(_cp)
+
             # 초기 클립 슬롯 — 실제 첫 처리 클립에 스피너
             init_slots = []
             first_idx = wan_indices[0] if wan_indices else (s2v_indices[0] if s2v_indices else 0)
             for i, sc in enumerate(scenes):
                 sno = sc.scene_no
-                init_slots.append({
-                    "status": "running" if i == first_idx else "pending",
+                # 기존 클립이 있으면 done 표시
+                if clip_files[i]:
+                    _init_status = "done"
+                elif i == first_idx:
+                    _init_status = "running"
+                else:
+                    _init_status = "pending"
+                _init_slot = {
+                    "status": _init_status,
                     "image_url": f"/storage/projects/{project_id}/images/scene_{sno:02d}.png",
                     "start_sec": getattr(sc, 'start_sec', 0),
                     "end_sec": getattr(sc, 'end_sec', 0),
@@ -727,7 +741,10 @@ async def _run_pipeline_steps(
                     "shot_type": getattr(sc, 'shot_type', 'medium'),
                     "_has_vocal": _has_vocals(sc),
                     "is_vocalist": getattr(sc, "is_vocalist", False),
-                })
+                }
+                if clip_files[i]:
+                    _init_slot["url"] = f"/storage/projects/{project_id}/clips/clip_{sno:02d}.mp4"
+                init_slots.append(_init_slot)
             await emitter.update(4, "running",
                                  f"{engine_desc} 영상 클립 생성 중...",
                                  {"current": 0, "total": len(scenes),
@@ -735,7 +752,6 @@ async def _run_pipeline_steps(
             await _log_step(project_id, 4, "영상 클립 생성", "running")
 
             clip_duration = get_clip_duration()
-            clip_files = [None] * len(scenes)
             done_count = 0
             _current_clip_idx = -1  # 현재 제작중인 클립 인덱스
 
