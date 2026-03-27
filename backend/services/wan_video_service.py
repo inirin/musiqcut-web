@@ -176,7 +176,8 @@ def _build_native_workflow(image_name: str, prompt: str, seed: int,
     }
 
 
-async def _queue_and_wait(workflow: dict, timeout: int = 1800) -> dict:
+async def _queue_and_wait(workflow: dict, timeout: int = 1800,
+                          abort_check: Optional[Callable] = None) -> dict:
     data = json.dumps({"prompt": workflow}).encode("utf-8")
     req = urllib.request.Request(
         f"{COMFYUI_URL}/prompt", data=data,
@@ -187,7 +188,19 @@ async def _queue_and_wait(workflow: dict, timeout: int = 1800) -> dict:
 
     start = time.time()
     while time.time() - start < timeout:
-        await asyncio.sleep(5)
+        # 0.5초 단위로 abort 체크 (총 5초 대기)
+        for _ in range(10):
+            await asyncio.sleep(0.5)
+            if abort_check and abort_check():
+                try:
+                    _req = urllib.request.Request(
+                        f"{COMFYUI_URL}/interrupt", data=b"",
+                        headers={"Content-Type": "application/json"},
+                        method="POST")
+                    urllib.request.urlopen(_req)
+                except Exception:
+                    pass
+                raise _AbortedError("파이프라인 중단 요청")
         try:
             resp = await asyncio.to_thread(
                 urllib.request.urlopen,
@@ -207,6 +220,11 @@ async def _queue_and_wait(workflow: dict, timeout: int = 1800) -> dict:
             pass
 
     raise TimeoutError(f"ComfyUI 추론 타임아웃 ({timeout}초)")
+
+
+class _AbortedError(Exception):
+    """ComfyUI 작업 중단."""
+    pass
 
 
 async def _convert_webp_to_mp4(prefix: str, out_path: Path):
@@ -251,8 +269,8 @@ async def _ffmpeg_still_video(image_file: str, out_path: Path,
     cmd = [
         "ffmpeg", "-y", "-loop", "1", "-i", image_file,
         "-c:v", "libx264", "-t", str(duration), "-pix_fmt", "yuv420p",
-        "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
-               f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2",
+        "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+               f"crop={WIDTH}:{HEIGHT}",
         "-r", str(OUTPUT_FPS), str(out_path)]
     result = await asyncio.to_thread(
         subprocess.run, cmd, capture_output=True, text=True)
@@ -265,6 +283,7 @@ async def generate_video_clips(
     scenes: list,
     image_paths: list[str],
     progress_cb: Optional[Callable] = None,
+    abort_check: Optional[Callable] = None,
 ) -> list[str]:
     input_dir = COMFYUI_DIR / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
@@ -290,15 +309,29 @@ async def generate_video_clips(
         img.save(str(input_dir / img_name))
 
         shot_type = getattr(scene, 'shot_type', 'medium')
-        if shot_type == 'wide':
-            # 와이드샷: 물리법칙 준수 + 자연스러운 다채로움
+        img_prompt = getattr(scene, "image_prompt", scene.description)
+        # 와이드샷: image_prompt에 "no people" 포함 여부로 인물 유무 판별
+        wide_has_people = (shot_type == 'wide'
+                           and 'no people' not in img_prompt.lower()
+                           and 'no characters' not in img_prompt.lower())
+        if shot_type == 'wide' and not wide_has_people:
+            # 와이드샷 (인물 없음): 환경 모션만
             main_prompt = (
-                f'Cinematic scene, gentle camera movement, '
+                f'Cinematic landscape scene, gentle camera movement, '
+                f'absolutely no people, no humans, no characters, no figures, empty scene, '
                 f'all motion must obey real-world physics, '
                 f'only things that naturally move in reality should move '
                 f'(e.g. water flows, clouds drift, leaves fall, fire flickers, wind blows), '
-                f'rigid objects stay still, no people appearing, '
-                f'{getattr(scene, "image_prompt", scene.description)}'
+                f'rigid objects stay still, '
+                f'{img_prompt}'
+            )
+        elif shot_type == 'wide' and wide_has_people:
+            # 와이드샷 (등장인물 있음): 전신 캐릭터 모션 + 환경
+            main_prompt = (
+                f'Cinematic wide shot, gentle full body movement, walking or standing, '
+                f'mouth closed, no talking, '
+                f'natural environment motion, wind, atmospheric, '
+                f'{img_prompt}'
             )
         else:
             # 클로즈업/미디엄: 캐릭터 모션 (립싱크 아닌 클립 — 입 닫힌 채)
@@ -306,7 +339,7 @@ async def generate_video_clips(
                 f'Animated character with mouth firmly closed the entire time, '
                 f'lips sealed shut, never opens mouth, '
                 f'natural body sway, expressive eyes, gentle head movement, '
-                f'cinematic lighting, {getattr(scene, "image_prompt", scene.description)}'
+                f'cinematic lighting, {img_prompt}'
             )
         prompts_to_try = [main_prompt]
         prompts_to_try.extend(FALLBACK_PROMPTS)
@@ -324,18 +357,25 @@ async def generate_video_clips(
                       f"{TOTAL_STEPS - SWITCH_STEP} LOW)", file=sys.stderr)
                 scene_dur = getattr(scene, 'duration', 0) or CLIP_DURATION
                 frames = _calc_frames(scene_dur)
-                neg = ("blurry, distorted, low quality, watermark, "
-                       "person appearing, human emerging, "
-                       "physically impossible motion, defying gravity, "
-                       "inanimate objects moving on their own "
-                       "(e.g. clothes standing up, furniture sliding, rocks floating)"
-                       if shot_type == 'wide' else
-                       "blurry, distorted, low quality, watermark, "
-                       "talking, singing, lip sync, mouth opening and closing as if speaking")
+                if shot_type == 'wide' and not wide_has_people:
+                    neg = ("blurry, distorted, low quality, watermark, "
+                           "person, people, human, man, woman, boy, girl, face, figure, character, "
+                           "person appearing, human emerging, someone walking in, "
+                           "physically impossible motion, defying gravity, "
+                           "inanimate objects moving on their own "
+                           "(e.g. clothes standing up, furniture sliding, rocks floating)")
+                elif shot_type == 'wide' and wide_has_people:
+                    neg = ("blurry, distorted, low quality, watermark, "
+                           "extra people appearing, new character emerging, crowd forming, "
+                           "talking, singing, lip sync, mouth opening, "
+                           "physically impossible motion, defying gravity")
+                else:
+                    neg = ("blurry, distorted, low quality, watermark, "
+                           "talking, singing, lip sync, mouth opening and closing as if speaking")
                 wf = _build_native_workflow(
                     img_name, attempt_prompt, seed, prefix, frames,
                     neg_prompt=neg)
-                await _queue_and_wait(wf, timeout=1800)
+                await _queue_and_wait(wf, timeout=1800, abort_check=abort_check)
                 await _convert_webp_to_mp4(prefix, out)
                 success = True
                 break

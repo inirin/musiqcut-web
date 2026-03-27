@@ -84,7 +84,13 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
   - 색상: 단색이면 정확한 색 (jet black, platinum blonde, chestnut brown), 그라데이션이면 양쪽 색 명시
   - 앞머리: bangs 유무 + 형태 (blunt bangs, side-swept bangs, curtain bangs, no bangs 등)
   - 장식: 헤어핀, 리본, 머리띠, 꽃 등 있으면 반드시 명시
-- description_en에 위 헤어 정보를 **매번 빠짐없이** 포함하세요
+- **체형(build)도 AI 이미지 일관성의 핵심** — 반드시 구체적으로:
+  - 체격: slim, slender, petite, athletic, muscular, stocky, heavyset, average build, curvy, lanky, broad-shouldered 등
+  - 키: short, average height, tall, very tall 등 상대적 키
+  - 체형 특징: narrow waist, wide hips, long legs, long neck, round face, angular jawline, small frame, large frame 등
+  - 어깨: narrow shoulders, broad shoulders, rounded shoulders 등
+  - **같은 캐릭터가 클로즈업/미디엄/와이드 모두에서 동일 체형으로 보여야 함** — 와이드샷에서 체형이 달라지지 않도록 명확히 정의
+- description_en에 위 헤어 + 체형 정보를 **매번 빠짐없이** 포함하세요
 - description_en은 선택한 art_style에 맞춰 작성
 - **첫 번째 캐릭터 = 주인공 = 보컬리스트**: 이 캐릭터의 성별/나이대가 vocal_style과 반드시 일치해야 함
 
@@ -104,7 +110,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
   "characters": [
     {{
       "name": "캐릭터 이름/별칭 (한국어)",
-      "description_en": "3D animated character, female, early 20s, shoulder-length wavy brown hair, bright green eyes, fair skin, slim build, wearing a yellow sundress with white sneakers, small star-shaped earring on left ear"
+      "description_en": "3D animated character, female, early 20s, shoulder-length wavy chestnut brown hair with side-swept bangs, bright green eyes, fair skin, slim slender build, average height, narrow shoulders, long neck, wearing a yellow sundress with white sneakers, small star-shaped earring on left ear"
     }}
   ]
 }}
@@ -128,9 +134,11 @@ SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입
 샷 구성 가이드 (뮤지컬 영상 연출):
 - 전체 장면의 20~30%는 **클로즈업** (얼굴이 화면의 30%+ 차지, 감정 전달/립싱크용)
 - 전체 장면의 30~40%는 **미디엄샷** (상반신, 제스처와 표정 모두 보임)
-- 전체 장면의 30~40%는 **와이드샷** (풍경/배경/소품/상징물 중심, 인물 없거나 작게)
-- **인물 장면과 비인물 장면을 번갈아 배치** — 인물 클로즈업 다음엔 풍경/배경/소품 와이드샷으로 호흡 조절
-- 와이드샷은 인물이 아닌 배경/풍경/자연/건물/소품/상징물을 주제로 (달빛, 강, 낙엽, 빈 옥좌, 성벽 등)
+- 전체 장면의 30~40%는 **와이드샷** (전신/배경 중심, 등장인물이 나올 수도 있고 풍경만일 수도 있음)
+- **인물 장면과 비인물 장면을 번갈아 배치** — 인물 클로즈업 다음엔 풍경 와이드샷으로 호흡 조절
+- **와이드샷에 주요 인물이 등장할 경우**: 반드시 캐릭터 프로필의 description_en 전체를 image_prompt에 포함
+- **장면에 필요한 엑스트라(판사, 의사, 점원, 행인 등)**: 등장 가능하지만 **뒷모습, 실루엣, 흐릿한 배경 처리**로 묘사 (예: "a blurred silhouette of a judge seen from behind"). 엑스트라의 얼굴/외형을 구체적으로 묘사하지 말 것 — AI가 주인공과 혼동합니다
+- **와이드샷에 인물이 없는 장면**: 반드시 사람이 존재할 수 없는 구도여야 함. 건물 외관, 하늘, 자연 풍경, 소품 극접사, 빈 거리 등. **실내(법정, 교실, 카페 등)는 인물 없이 그려도 AI가 사람을 추가하므로 피할 것** — 외부 전경이나 소품/상징물 클로즈업 위주로 구성
 - 가장 감정이 강한 가사 줄은 클로즈업으로 배치
 - **보컬 구간의 클로즈업/미디엄샷은 반드시 노래하는 주인공만** 배치
 - **is_vocalist=false인 인물 장면은 얼굴 정면을 피할 것** — 뒷모습, 실루엣, 손/발 클로즈업, 멀리서 바라보는 구도 등 (AI 모델이 정면 얼굴을 말하는 것처럼 움직이는 문제 방지)
@@ -158,12 +166,15 @@ SCENE_PROMPT = """당신은 뮤지컬 애니메이션 장면 구성 전문가입
 
 image_prompt 작성 규칙:
 - **핵심: 캐릭터가 등장하는 장면은 반드시 위 캐릭터 프로필의 description_en을 image_prompt에 그대로 포함**
-- 매 장면마다 캐릭터의 머리 스타일/색, 의상, 특징적 액세서리 등을 빠짐없이 반복 명시
+- 매 장면마다 캐릭터의 체형(build/height/shoulders), 머리 스타일/색, 의상, 특징적 액세서리 등을 빠짐없이 반복 명시
+- **특히 와이드샷/미디엄샷에서 체형 묘사 누락 금지** — 전신이 보이는 샷일수록 체형 키워드(slim, athletic, broad-shouldered 등)가 반드시 포함되어야 일관성 유지
 - **한 장면에 등장하는 인물은 최대 2~3명까지** — 군중씬이나 4명 이상은 금지 (AI 이미지 생성 한계로 인물이 복제되어 보임). 2~3명일 때는 각 인물의 의상/체형/위치를 명확히 구분
 - 클로즈업: **매번 다른 앵글/구도로** — 정면 초상화만 반복 금지! 다양한 예시: "side profile looking away", "over-the-shoulder from behind", "tilted angle looking up at the sky", "three-quarter view with wind in hair", "extreme close-up on eyes only", "low angle looking down at camera"
 - 미디엄샷: "medium shot, upper body visible, dynamic hand gestures, head tilt, breathing motion, emotional body language"
-- 와이드샷: "wide cinematic shot, full body silhouette, detailed environment, atmospheric lighting, character in motion"
+- 와이드샷 (인물 없음): "wide cinematic shot, no people, no characters, no figures, empty scene, detailed environment, atmospheric lighting" — **실내 공간(법정, 카페, 교실 등)은 AI가 인물을 생성하므로 금지. 외부 풍경/건물 외관/하늘/소품 극접사만**
+- 와이드샷 (인물 있음): "wide cinematic shot, full body, [주인공 description_en 전체], detailed environment, atmospheric lighting" — 엑스트라는 "blurred figure from behind" 등 최소 묘사만
 - 모든 프롬프트에 조명, 분위기, 색감, 캐릭터의 감정 상태를 구체적으로 포함
+- **프로필에 없는 엑스트라 인물은 "blurred silhouette from behind" 등으로 최소화** — 얼굴/외형을 구체적으로 묘사하면 AI가 주인공과 동일한 외형으로 그려버립니다. 엑스트라는 항상 흐릿하게/뒷모습으로
 - **모든 image_prompt에 반드시 포함**: "no text, no subtitles, no captions, no letters, no watermark, no title, not photorealistic, not a photograph" — 이미지 안에 글자 금지 + 실사/사진풍 금지
 - 모든 프롬프트에 조명, 분위기, 색감, 캐릭터의 감정 상태를 구체적으로 포함하되, 매번 다채롭고 창의적으로"""
 

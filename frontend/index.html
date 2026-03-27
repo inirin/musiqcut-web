@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
   <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
-  <link rel="stylesheet" href="/css/style.css?v=1774475000">
+  <link rel="stylesheet" href="/css/style.css?v=1774509719">
 </head>
 <body>
 <div class="app">
@@ -183,7 +183,8 @@
         </div>
       </div>
 
-      <div style="text-align:center;padding:16px 0 80px">
+      <div style="text-align:center;padding:16px 0 80px;display:flex;gap:16px;justify-content:center">
+        <button id="abort-pipeline-btn" onclick="abortPipeline()" class="hidden" style="background:none;border:none;cursor:pointer;color:var(--warning);font-size:var(--text-sm);opacity:0.6;transition:opacity 0.2s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.6'">파이프라인 중단</button>
         <button onclick="deleteProject()" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:var(--text-sm);opacity:0.6;transition:opacity 0.2s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.6'">작품 삭제하기</button>
       </div>
     </div>
@@ -473,11 +474,11 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=1774268702"></script>
-<script src="/js/dashboard.js?v=1774468000"></script>
-<script src="/js/pipeline.js?v=1774475000"></script>
-<script src="/js/feedback.js?v=1774268702"></script>
-<script src="/js/settings.js?v=1774470000"></script>
+<script src="/js/app.js?v=1774509719"></script>
+<script src="/js/dashboard.js?v=1774509719"></script>
+<script src="/js/pipeline.js?v=1774509719"></script>
+<script src="/js/feedback.js?v=1774509719"></script>
+<script src="/js/settings.js?v=1774509719"></script>
 
 </body>
 </html>

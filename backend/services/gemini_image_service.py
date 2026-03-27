@@ -15,31 +15,33 @@ TARGET_HEIGHT = 1024
 
 
 def _resize_to_target(img_bytes: bytes) -> bytes:
-    """Imagen 출력을 576×1024 (9:16)으로 리사이즈+크롭."""
+    """Imagen 출력을 576×1024 (9:16)으로 cover-crop (검은 바 없음)."""
     img = Image.open(BytesIO(img_bytes))
-    # 너비 기준 리사이즈 후 높이 크롭/패딩
-    ratio = TARGET_WIDTH / img.width
-    new_h = int(img.height * ratio)
-    img = img.resize((TARGET_WIDTH, new_h), Image.LANCZOS)
+    # cover 방식: 큰 비율 기준 리사이즈 → 중앙 크롭
+    scale = max(TARGET_WIDTH / img.width, TARGET_HEIGHT / img.height)
+    new_w = int(img.width * scale)
+    new_h = int(img.height * scale)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
 
-    if new_h >= TARGET_HEIGHT:
-        top = (new_h - TARGET_HEIGHT) // 2
-        img = img.crop((0, top, TARGET_WIDTH, top + TARGET_HEIGHT))
-    else:
-        canvas = Image.new("RGB", (TARGET_WIDTH, TARGET_HEIGHT), (0, 0, 0))
-        paste_y = (TARGET_HEIGHT - new_h) // 2
-        canvas.paste(img, (0, paste_y))
-        img = canvas
+    left = (new_w - TARGET_WIDTH) // 2
+    top = (new_h - TARGET_HEIGHT) // 2
+    img = img.crop((left, top, left + TARGET_WIDTH, top + TARGET_HEIGHT))
 
     buf = BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
 
 
+class ImageAbortedError(Exception):
+    """이미지 생성 중단."""
+    pass
+
+
 async def generate_images(
     project_id: str,
     scenes: list,
     progress_cb: Optional[Callable] = None,
+    abort_check: Optional[Callable] = None,
 ) -> list[str]:
     """Imagen 4로 장면 이미지 생성 (멀티 키 로테이션)."""
     keys = get_api_keys()
@@ -50,6 +52,11 @@ async def generate_images(
     paths = []
 
     for i, scene in enumerate(scenes):
+        # abort 체크 — 매 이미지 생성 전
+        if abort_check and abort_check():
+            print(f"[STEP3] 중단 요청 감지 — 이미지 생성 중단", file=sys.stderr)
+            raise ImageAbortedError("파이프라인 중단 요청")
+
         out = image_path(project_id, scene.scene_no)
 
         if out.exists() and out.stat().st_size > 1000:

@@ -17,6 +17,8 @@ from backend.services.gemini_image_service import generate_images
 from backend.services.suno_service import generate_music, measure_audio_duration
 from backend.services.wan_video_service import generate_video_clips as wan_generate_clips
 from backend.services.wan_video_service import get_clip_duration
+from backend.services.wan_video_service import _AbortedError as _ComfyAbortError
+from backend.services.gemini_image_service import ImageAbortedError as _ImageAbortError
 from backend.services.wan_s2v_service import is_available as s2v_available
 from backend.services.wan_s2v_service import generate_lipsync_clip as s2v_generate_lipsync
 from backend.services.lipsync_precheck import separate_vocals
@@ -254,13 +256,16 @@ async def run_pipeline(
     emitter: ProgressEmitter,
     resume_from: int = 0,
     length: str = "short",
+    skip_clean: bool = False,
 ):
-    """파이프라인 실행. 보컬 감지 실패 시 Step 1부터 자동 재시도."""
+    """파이프라인 실행. 보컬 감지 실패 시 Step 1부터 자동 재시도.
+    skip_clean=True면 resume 시 _clean_step_files를 건너뜀 (장면 재생성용)."""
     for attempt in range(_MAX_VOCAL_RETRY + 1):
         try:
             result = await _run_pipeline_steps(
                 project_id, theme, mood, emitter,
-                resume_from=resume_from, length=length)
+                resume_from=resume_from, length=length,
+                skip_clean=skip_clean)
             return result  # 성공
         except _VocalDetectionError:
             if attempt >= _MAX_VOCAL_RETRY:
@@ -278,6 +283,11 @@ class _VocalDetectionError(Exception):
     pass
 
 
+class _PipelineAbortError(Exception):
+    """파이프라인 중단 요청 — 장면 재생성 등으로 현재 작업 중단."""
+    pass
+
+
 async def _run_pipeline_steps(
     project_id: str,
     theme: str,
@@ -285,6 +295,7 @@ async def _run_pipeline_steps(
     emitter: ProgressEmitter,
     resume_from: int = 0,
     length: str = "short",
+    skip_clean: bool = False,
 ):
     current_step = 0
     try:
@@ -294,7 +305,8 @@ async def _run_pipeline_steps(
         if resume_from > 0:
             all_completed = await _get_completed_steps(project_id)
             completed = {k: v for k, v in all_completed.items() if k < resume_from}
-            await _clean_step_files(project_id, resume_from)
+            if not skip_clean:
+                await _clean_step_files(project_id, resume_from)
             # 완료된 스텝의 원래 시작 시간을 emitter에 복원 (0초 소요 버그 방지)
             async with aiosqlite.connect(DB_PATH) as db:
                 db.row_factory = aiosqlite.Row
@@ -350,7 +362,7 @@ async def _run_pipeline_steps(
         if 2 in completed and audio.exists():
             audio_file = str(audio)
             actual_duration = await measure_audio_duration(audio_file)
-            scene_count = max(3, math.ceil(actual_duration / get_clip_duration()))
+            scene_count = max(3, round(actual_duration / get_clip_duration()))
             await emitter.update(2, "running",
                 f"음악 로드 완료, 가사 분석 중...",
                 {"audio_url": f"/storage/projects/{project_id}/music/output.mp3"})
@@ -361,7 +373,7 @@ async def _run_pipeline_steps(
             audio_file, actual_duration = await generate_music(
                 project_id, music_prompt, lyrics, length=length
             )
-            scene_count = max(3, math.ceil(actual_duration / get_clip_duration()))
+            scene_count = max(3, round(actual_duration / get_clip_duration()))
             await emitter.update(2, "running",
                 f"음악 생성 완료! 가사 분석 준비 중...",
                 {"audio_url": f"/storage/projects/{project_id}/music/output.mp3"})
@@ -384,12 +396,22 @@ async def _run_pipeline_steps(
                 # 신 형식: instrumental 포함 전체
                 timed_lines = []
                 for i, t in enumerate(_cached_lyrics):
-                    timed_lines.append({"text": t.get("text", ""),
-                                        "start": t.get("start", i * 5.0),
-                                        "end": t.get("end", (i+1) * 5.0),
-                                        "has_vocal": t.get("has_vocal", False),
-                                        "words": t.get("words", [])})
-                scene_count = max(scene_count, len(timed_lines))
+                    seg = {"text": t.get("text", ""),
+                           "start": t.get("start", i * 5.0),
+                           "end": t.get("end", (i+1) * 5.0),
+                           "has_vocal": t.get("has_vocal", False),
+                           "words": t.get("words", [])}
+                    # 빈 세그먼트 (0.0~0.0) 제거 — ceil→round 전환 시 남은 잔재
+                    if seg["start"] == 0 and seg["end"] == 0 and not seg["text"]:
+                        continue
+                    timed_lines.append(seg)
+                # scene_count와 동기화 (초과분 트리밍)
+                if len(timed_lines) > scene_count:
+                    timed_lines = timed_lines[:scene_count]
+                    if timed_lines:
+                        timed_lines[-1]["end"] = round(actual_duration, 2)
+                elif len(timed_lines) < scene_count:
+                    scene_count = len(timed_lines)
         try:
             if not timed_lines:
                 if resume_from <= 2:
@@ -451,9 +473,16 @@ async def _run_pipeline_steps(
                 except Exception as e:
                     print(f"[LyricsSync] Gemini 보정 실패 (원본 사용): {e}", file=sys.stderr)
 
-            # 곡 길이 기준 scene_count가 timed_lines보다 크면 유지
-            # (구 형식 캐시에서 보컬만 복원된 경우 대비)
-            scene_count = max(scene_count, len(timed_lines))
+            # scene_count와 timed_lines 동기화
+            if len(timed_lines) > scene_count:
+                # 초과 세그먼트 제거 (마지막 세그먼트의 end를 곡 끝으로)
+                timed_lines = timed_lines[:scene_count]
+                if timed_lines:
+                    timed_lines[-1]["end"] = round(actual_duration, 2)
+                print(f"[LyricsSync] 세그먼트 {len(timed_lines)}개로 트리밍 (scene_count={scene_count})",
+                      file=sys.stderr)
+            elif len(timed_lines) < scene_count:
+                scene_count = len(timed_lines)
             for sg in timed_lines:
                 label = sg["text"][:30] if sg["text"] else "(instrumental)"
                 vocal = "♪" if sg["has_vocal"] else " "
@@ -488,21 +517,56 @@ async def _run_pipeline_steps(
         current_step = 3
         # lyrics.json에 scenes가 있으면 장면 구성 캐시 사용
         script_data = json.loads(lp.read_text(encoding="utf-8"))
-        img1 = image_path(project_id, 1)
+        cached_scenes = script_data.get("scenes", [])
+        imgs_dir = image_path(project_id, 1).parent
+        img_count = _count_files(imgs_dir, "scene_*.png")
 
-        if 3 in completed and img1.exists():
-            imgs_dir = image_path(project_id, 1).parent
-            img_count = _count_files(imgs_dir, "scene_*.png")
-            scenes = [ScriptScene(**s) for s in script_data.get("scenes", [])]
-            if not scenes:
-                scenes = [ScriptScene(scene_no=i+1, description="", image_prompt="")
-                          for i in range(img_count)]
+        if 3 in completed and cached_scenes and img_count >= len(cached_scenes):
+            # 전부 완료 — 스킵
+            scenes = [ScriptScene(**s) for s in cached_scenes]
             image_files = [str(image_path(project_id, i + 1))
                           for i in range(img_count)]
             await emitter.update(3, "done", f"이미지 {img_count}장",
                 {"image_urls": [
                     f"/storage/projects/{project_id}/images/scene_{i+1:02d}.png"
                     for i in range(img_count)]})
+        elif cached_scenes:
+            # scenes 캐시 있음 — Gemini 장면 구성 스킵, 누락 이미지만 생성
+            scenes = [ScriptScene(**s) for s in cached_scenes]
+            # 누락된 이미지 확인
+            missing = [i for i, sc in enumerate(scenes)
+                       if not image_path(project_id, sc.scene_no).exists()]
+            if missing:
+                await emitter.update(3, "running",
+                    f"누락 이미지 {len(missing)}장 재생성 중...")
+                await _log_step(project_id, 3, "장면 구성 + 이미지", "running")
+
+                async def _step3_progress(current, total):
+                    existing_urls = [
+                        f"/storage/projects/{project_id}/images/scene_{sc.scene_no:02d}.png"
+                        for sc in scenes if image_path(project_id, sc.scene_no).exists()]
+                    display = min(current + 1, total)
+                    await emitter.update(3, "running",
+                        f"이미지 생성 중... {display}/{total}",
+                        {"current": display, "total": total, "image_urls": existing_urls})
+                    await _update_step_progress(project_id, 3,
+                        "장면 구성 + 이미지", display, total)
+
+                # generate_images는 내부에서 파일 존재 시 건너뛰므로 전체 전달 OK
+                image_files = await generate_images(
+                    project_id, scenes, progress_cb=_step3_progress,
+                    abort_check=lambda: emitter._abort)
+            else:
+                image_files = [str(image_path(project_id, sc.scene_no))
+                              for sc in scenes]
+
+            await _log_step(project_id, 3, "장면 구성 + 이미지", "done",
+                            {"image_count": len(image_files)})
+            await emitter.update(3, "done",
+                f"이미지 {len(image_files)}장 완료!",
+                {"image_urls": [
+                    f"/storage/projects/{project_id}/images/scene_{sc.scene_no:02d}.png"
+                    for sc in scenes]})
         else:
             # 3-1: 장면 구성 (Gemini) — 가사 싱크 타이밍 전달
             await emitter.update(3, "running",
@@ -554,7 +618,6 @@ async def _run_pipeline_steps(
                 json.dumps(script_data, ensure_ascii=False, indent=2),
                 encoding="utf-8"
             )
-            # STEP 2 done은 라인 384에서 이미 전송됨 — 중복 전송 제거
 
             # 3-2: 이미지 생성 (Imagen 4 API)
             await emitter.update(3, "running",
@@ -571,7 +634,8 @@ async def _run_pipeline_steps(
                     "장면 구성 + 이미지", display, total)
 
             image_files = await generate_images(
-                project_id, scenes, progress_cb=_step3_progress)
+                project_id, scenes, progress_cb=_step3_progress,
+                abort_check=lambda: emitter._abort)
             await _log_step(project_id, 3, "장면 구성 + 이미지", "done",
                             {"image_count": len(image_files)})
             await emitter.update(3, "done",
@@ -731,7 +795,8 @@ async def _run_pipeline_steps(
                             prompt=getattr(scene, 'image_prompt', scene.description),
                             has_vocal=_has_vocals(scene),
                             is_vocalist=getattr(scene, 'is_vocalist', True),
-                            shot_type=getattr(scene, 'shot_type', 'medium'))
+                            shot_type=getattr(scene, 'shot_type', 'medium'),
+                            abort_check=lambda: emitter._abort)
                         clip_files[idx] = result
                     except Exception as e:
                         print(f"[STEP4] S2V 실패 (장면 {scene.scene_no}), "
@@ -741,6 +806,10 @@ async def _run_pipeline_steps(
                         await _ffmpeg_still_video(image_files[idx], still_out, duration=scene_dur)
                         clip_files[idx] = str(still_out)
                     await _step4_progress_update()
+                    # 중단 요청 확인 (장면 재생성 등)
+                    if emitter._abort:
+                        print(f"[STEP4] 중단 요청 감지 — S2V 루프 종료", file=sys.stderr)
+                        raise _PipelineAbortError("파이프라인 중단 요청")
 
             # 와이드/비보컬 → Wan I2V
             wan_scenes = [s for i, s in enumerate(scenes) if i in wan_indices]
@@ -765,10 +834,15 @@ async def _run_pipeline_steps(
                     else:
                         _current_clip_idx = -1
                     await _step4_progress_update()
+                    # 중단 요청 확인 (장면 재생성 등)
+                    if emitter._abort:
+                        print(f"[STEP4] 중단 요청 감지 — I2V 루프 종료", file=sys.stderr)
+                        raise _PipelineAbortError("파이프라인 중단 요청")
 
                 wan_results = await wan_generate_clips(
                     project_id, wan_scenes, wan_images,
-                    progress_cb=_wan_progress)
+                    progress_cb=_wan_progress,
+                    abort_check=lambda: emitter._abort)
                 for j, idx in enumerate(wan_indices):
                     clip_files[idx] = wan_results[j]
 
@@ -822,7 +896,8 @@ async def _run_pipeline_steps(
 
         final_video = await render_video(
             project_id, clip_files, audio_file,
-            scenes=scenes_dicts, whisper_lyrics=_whisper_lyrics
+            scenes=scenes_dicts, whisper_lyrics=_whisper_lyrics,
+            title=title, theme=theme,
         )
         await _log_step(project_id, 5, "영상 합성", "done",
                         {"video_path": final_video})
@@ -831,6 +906,23 @@ async def _run_pipeline_steps(
         await emitter.update(5, "done", "영상 합성 완료!")
         await emitter.complete(final_video)
 
+    except (_PipelineAbortError, _ComfyAbortError, _ImageAbortError):
+        # 중단 요청 — 프로젝트 + 현재 스텝을 failed로 마킹
+        print(f"[Pipeline] 중단됨 (project={project_id}, step={current_step})", file=sys.stderr)
+        await _update_project(project_id, status="failed", error_msg="사용자 중단")
+        step_names = {1: "스토리 생성", 2: "음악 생성", 3: "장면 구성 + 이미지",
+                      4: "영상 클립 생성", 5: "영상 합성"}
+        await _log_step(project_id, current_step,
+                        step_names.get(current_step, f"STEP {current_step}"),
+                        "failed", error_msg="사용자 중단")
+        await emitter._broadcast({"type": "aborted", "step": current_step,
+                                   "message": "파이프라인이 중단되었습니다."})
+        emitter._done = True
+        # 새 emitter가 이미 등록되었을 수 있으므로, 자기 자신일 때만 제거
+        from backend.utils.progress import get_emitter, unregister_emitter
+        if get_emitter(project_id) is emitter:
+            unregister_emitter(project_id)
+        return  # 정상 종료 — lock 해제됨
     except Exception as e:
         await _update_project(project_id, status="failed", error_msg=str(e))
         step_names = {

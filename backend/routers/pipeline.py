@@ -29,6 +29,16 @@ async def pipeline_status():
     return {"running": _pipeline_lock.locked(), "project_id": _running_project_id}
 
 
+@router.post("/abort/{project_id}")
+async def abort_pipeline_endpoint(project_id: str):
+    """진행 중인 파이프라인 중단."""
+    emitter = get_emitter(project_id)
+    if not emitter or emitter.done:
+        return {"ok": False, "error": "실행 중인 파이프라인이 없습니다."}
+    emitter._abort = True
+    return {"ok": True, "message": "중단 요청이 전송되었습니다."}
+
+
 @router.get("/random-theme")
 async def random_theme():
     """Gemini로 랜덤 테마/분위기 생성."""
@@ -41,11 +51,21 @@ async def random_theme():
 
 @router.post("/{project_id}/regenerate-scene/{scene_no}")
 async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_image: bool = True):
-    """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume. 진행 중이면 완료 후 실행."""
+    """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume.
+    진행 중이면 현재 클립 완료 후 중단 → 재생성 시작."""
     global _running_project_id
 
     from pathlib import Path
     from backend.utils.file_manager import image_path, clip_path
+
+    # 진행 중인 파이프라인이 있으면 abort 요청
+    existing_emitter = get_emitter(project_id)
+    is_aborting = False
+    if _pipeline_lock.locked() and existing_emitter and not existing_emitter.done:
+        existing_emitter._abort = True
+        is_aborting = True
+        print(f"[Regen] 진행 중인 파이프라인에 중단 요청 (project={project_id})",
+              file=__import__('sys').stderr)
 
     # 해당 장면 파일 삭제
     deleted = []
@@ -71,7 +91,7 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
 
     print(f"[Regen] 장면 {scene_no} 삭제: {deleted}", file=__import__('sys').stderr)
 
-    # DB 스텝 초기화 + resume
+    # DB 스텝 초기화 — Step 5(영상 합성)만 삭제 + from_step 이후 스텝 리셋
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         row = await db.execute("SELECT theme, mood, length FROM projects WHERE id=?", (project_id,))
@@ -80,12 +100,10 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
             return {"ok": False, "error": "프로젝트를 찾을 수 없습니다."}
         theme, mood, length = row["theme"], row["mood"], row["length"] or "short"
 
+        # Step 3/4는 유지 (파일 단위로 이미 삭제됨), Step 5만 삭제
         await db.execute(
-            "DELETE FROM pipeline_steps WHERE project_id=? AND step_no>=?",
-            (project_id, from_step))
-        await db.execute(
-            "DELETE FROM feedback WHERE project_id=? AND step_no>=?",
-            (project_id, from_step))
+            "DELETE FROM pipeline_steps WHERE project_id=? AND step_no=5",
+            (project_id,))
         await db.commit()
 
     _running_project_id = project_id
@@ -97,13 +115,15 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
             try:
                 from backend.services.pipeline_service import run_pipeline
                 await run_pipeline(project_id, theme, mood, emitter,
-                                   resume_from=from_step, length=length)
+                                   resume_from=from_step, length=length,
+                                   skip_clean=True)
             finally:
                 _clear_running()
 
     asyncio.create_task(_run())
     return {"ok": True, "project_id": project_id, "scene_no": scene_no,
-            "from_step": from_step, "deleted": deleted}
+            "from_step": from_step, "deleted": deleted,
+            "aborting_current": is_aborting}
 
 
 @router.post("/run")
@@ -144,7 +164,9 @@ async def run_pipeline_endpoint(body: PipelineRunRequest):
 async def resume_pipeline_endpoint(project_id: str, from_step: int = 0, reset: bool = False):
     """특정 STEP부터 재시도. reset=true면 해당 스텝 결과물 삭제 후 처음부터."""
     global _running_project_id
-    if _pipeline_lock.locked():
+    step5_only = (from_step == 5)
+
+    if not step5_only and _pipeline_lock.locked():
         return {"ok": False, "error": "다른 작업이 진행 중입니다. 완료 후 다시 시도해주세요."}
 
     # reset=true면 해당 스텝의 캐시 파일 삭제
@@ -183,21 +205,36 @@ async def resume_pipeline_endpoint(project_id: str, from_step: int = 0, reset: b
             result = await cursor.fetchone()
             resume_from = (result["max_step"] or 0) + 1
 
-    _running_project_id = project_id
     emitter = ProgressEmitter(project_id)
     register_emitter(project_id, emitter)
 
-    async def _run_with_lock():
-        async with _pipeline_lock:
+    if step5_only:
+        # Step 5(FFmpeg 합성)는 GPU 미사용 → lock 없이 바로 실행
+        async def _run_no_lock():
             try:
                 await run_pipeline(
                     project_id, theme, mood, emitter,
                     resume_from=resume_from, length=length
                 )
             finally:
-                _clear_running()
+                if _running_project_id == project_id:
+                    _clear_running()
 
-    asyncio.create_task(_run_with_lock())
+        asyncio.create_task(_run_no_lock())
+    else:
+        _running_project_id = project_id
+
+        async def _run_with_lock():
+            async with _pipeline_lock:
+                try:
+                    await run_pipeline(
+                        project_id, theme, mood, emitter,
+                        resume_from=resume_from, length=length
+                    )
+                finally:
+                    _clear_running()
+
+        asyncio.create_task(_run_with_lock())
     return {"ok": True, "project_id": project_id}
 
 

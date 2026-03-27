@@ -9,6 +9,11 @@ TARGET_FPS = 24   # 모든 클립을 이 FPS로 통일
 TARGET_W = 736    # 최종 영상 해상도
 TARGET_H = 1280
 
+# 폰트 경로
+_FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+FONT_TITLE = str(_FONTS_DIR / "GmarketSansTTFBold.ttf")
+FONT_LYRICS = str(_FONTS_DIR / "NanumSquareBold.ttf")
+
 
 def _wrap_words(text: str, max_words: int = 4) -> str:
     """단어 단위 줄바꿈 (max_words 단어마다 개행)."""
@@ -20,19 +25,20 @@ def _wrap_words(text: str, max_words: int = 4) -> str:
 
 
 WPL = 3              # 한 줄에 최대 단어 수
-SILENCE_GAP = 1.0        # 이 시간 이상 보컬 공백이면 줄 순차 제거 시작
-MIN_LINE_DISPLAY = 1.0   # 줄의 마지막 단어 start 기준 최소 표시 시간 (무음 제거 시)
+SILENCE_GAP = 3.0        # 이 시간 이상 보컬 공백이면 줄 순차 제거 시작
+MIN_LINE_DISPLAY = 2.0   # 줄의 마지막 단어 start 기준 최소 표시 시간 (무음 제거 시)
+FADE_OUT_MS = 300        # 줄 사라질 때 fade-out (밀리초)
 
 
-def _generate_srt(scenes: list, out_path: Path,
+def _generate_ass(scenes: list, out_path: Path,
                   whisper_lyrics: list = None) -> Path:
-    """가사 자막 SRT 생성 — 노래방 스타일 2줄 교대.
+    """가사 자막 ASS 생성 — 노래방 스타일 2줄 교대 + fade-out.
 
-    1줄에 단어를 하나씩 채워감. 3단어로 가득 차면 그 줄 고정,
-    다른 줄부터 채우기 시작. 그 줄도 가득 차면 처음 줄 리셋 후 반복.
-    2초 이상 보컬 공백 시, 먼저 채워진 줄부터 매초 순차 제거.
+    슬롯 0(윗줄) / 슬롯 1(아랫줄) 독립 추적.
+    무음 갭 제거(케이스2) 및 곡 종료(케이스3) 시 fade-out 적용.
     """
-    srt_path = out_path.parent / "subtitles.srt"
+    ass_path = out_path.parent / "subtitles.ass"
+    fonts_escaped = str(_FONTS_DIR.resolve()).replace('\\', '/')
 
     # 1) 전체 단어 스트림 수집
     source = whisper_lyrics if whisper_lyrics else scenes
@@ -61,108 +67,147 @@ def _generate_srt(scenes: list, out_path: Path,
                 all_words.append({'text': text, 'start': start + 0.3, 'end': end - 0.2})
 
     if not all_words:
-        srt_path.write_text('', encoding='utf-8')
-        return srt_path
+        ass_path.write_text('', encoding='utf-8')
+        return ass_path
 
-    # 2) 이벤트 수집: (시간, 표시 텍스트)
-    #    단어 추가 이벤트 + 무음 갭 줄 제거 이벤트를 시간순으로 모음
-    events = []  # [(time, display_text), ...]
-    lines = ["", ""]
-    line_count = [0, 0]
-    line_filled_order = [0, 0]
-    line_last_word_start = [0.0, 0.0]  # 각 줄의 마지막 단어 start 시점
-    fill_seq = 0
-    active = 0
+    # 2) 2줄 push-up 세그먼트 추적
+    #    슬롯 0 = 윗줄 (이전 완성 문구), 슬롯 1 = 아랫줄 (현재 채우는 줄)
+    #    아랫줄 3단어 차면 → 윗줄로 즉시 이동, 아랫줄 새로 시작
+    slot_segs = [[], []]   # [(start, end, text, fade), ...]
+    slot_start = [0.0, 0.0]
+    slot_text = ["", ""]
 
-    def _display():
-        if lines[0] and lines[1]:
-            return f"{lines[0]}\n{lines[1]}"
-        return lines[0] or lines[1] or ""
+    def _close(si, t, fade=False):
+        """슬롯의 현재 텍스트를 세그먼트로 확정."""
+        if slot_text[si]:
+            end = t + (FADE_OUT_MS / 1000 if fade else 0)
+            slot_segs[si].append((slot_start[si], end, slot_text[si], fade))
+        slot_text[si] = ""
+        slot_start[si] = t
+
+    bottom = ""          # 아랫줄 텍스트
+    bcount = 0           # 아랫줄 단어 수
+    top_lws = 0.0        # 윗줄 마지막 단어 start
+    bottom_lws = 0.0     # 아랫줄 마지막 단어 start
+    top_order = 0
+    bottom_order = 0
+    seq = 0
 
     for wi, w in enumerate(all_words):
-        w_start = w['start']
+        ws = w['start']
         prev_end = all_words[wi - 1].get('end', all_words[wi - 1]['start']) if wi > 0 else 0
 
-        # 무음 갭 처리: 2초 이상이면 매초 먼저 채워진 줄부터 순차 제거
+        # 케이스 2: 무음 갭 → 먼저 채워진 줄부터 순차 fade-out
         if wi > 0:
-            gap = w_start - prev_end
-            if gap >= SILENCE_GAP and (lines[0] or lines[1]):
-                clear_order = sorted([0, 1], key=lambda i: line_filled_order[i])
-                clear_time = prev_end + SILENCE_GAP
-                for li in clear_order:
-                    if not lines[li]:
-                        continue
-                    if clear_time >= w_start:
+            gap = ws - prev_end
+            if gap >= SILENCE_GAP and (slot_text[0] or slot_text[1]):
+                pairs = []
+                if slot_text[0]:
+                    pairs.append((0, top_order, top_lws))
+                if slot_text[1]:
+                    pairs.append((1, bottom_order, bottom_lws))
+                pairs.sort(key=lambda x: x[1])
+                ct = prev_end + SILENCE_GAP
+                for si, _, lws in pairs:
+                    if ct >= ws:
                         break
-                    # 마지막 단어 start 기준 2초 미만이면 아직 제거하지 않음
-                    if clear_time - line_last_word_start[li] < MIN_LINE_DISPLAY:
+                    if ct - lws < MIN_LINE_DISPLAY:
                         continue
-                    lines[li] = ""
-                    line_count[li] = 0
-                    line_filled_order[li] = 0
-                    line_last_word_start[li] = 0.0
-                    disp = _display()
-                    # 줄 제거 후 표시할 텍스트가 있으면 이벤트, 없으면 빈 표시
-                    events.append((clear_time, disp))
-                    clear_time += 1.0
+                    _close(si, ct, fade=True)
+                    if si == 0:
+                        top_order = 0
+                        top_lws = 0.0
+                    else:
+                        bottom = ""
+                        bcount = 0
+                        bottom_order = 0
+                        bottom_lws = 0.0
+                    ct += 1.0
 
-        # 현재 줄이 가득 차있으면 다른 줄로 전환 + 리셋
-        if line_count[active] >= WPL:
-            active = 1 - active
-            lines[active] = ""
-            line_count[active] = 0
+        # 아랫줄 가득 참 → 윗줄로 즉시 이동 + 아랫줄 리셋
+        if bcount >= WPL:
+            _close(0, ws)                   # 윗줄 이전 내용 마감
+            # fade-out 중인 이전 Top 세그먼트가 현재 시점 넘으면 잘라내기
+            if slot_segs[0] and slot_segs[0][-1][1] > ws:
+                prev = slot_segs[0][-1]
+                slot_segs[0][-1] = (prev[0], ws, prev[2], False)
+            _close(1, ws)                   # 아랫줄 마감
+            slot_text[0] = bottom           # 아랫줄 텍스트를 윗줄에 즉시 표시
+            slot_start[0] = ws
+            top_lws = bottom_lws
+            top_order = bottom_order
+            bottom = ""
+            bcount = 0
 
-        # 빈 줄에 처음 채울 때 순서 기록
-        if line_count[active] == 0:
-            fill_seq += 1
-            line_filled_order[active] = fill_seq
+        # 아랫줄 첫 단어 시 순서 기록
+        if bcount == 0:
+            seq += 1
+            bottom_order = seq
 
-        # 단어 추가
-        lines[active] = (lines[active] + " " + w['text']).strip() if lines[active] else w['text']
-        line_count[active] += 1
-        line_last_word_start[active] = w_start
+        # 단어 추가 (항상 아랫줄)
+        bottom = (bottom + " " + w['text']).strip() if bottom else w['text']
+        bcount += 1
+        bottom_lws = ws
 
-        events.append((w_start, _display()))
+        # 슬롯 1(아랫줄) 세그먼트 갱신
+        if bottom != slot_text[1]:
+            _close(1, ws)
+            slot_text[1] = bottom
+            slot_start[1] = ws
 
-    # 마지막 단어의 종료 시점 (최소 표시 시간 보장)
+    # 케이스 3: 곡 종료 → 모든 슬롯 fade-out
     last_word = all_words[-1]
     last_end = max(last_word.get('end', last_word['start'] + 1.0),
                    last_word['start'] + MIN_LINE_DISPLAY)
+    for s in range(2):
+        _close(s, last_end, fade=True)
 
-    # 3) 이벤트 → SRT 변환 (겹침 없이 연결)
-    #    빈 텍스트 이벤트 제거 + 시간순 정렬
-    events = [(t, text) for t, text in events if text]
-    events.sort(key=lambda e: e[0])
+    # 3) ASS 파일 생성
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {TARGET_W}\n"
+        f"PlayResY: {TARGET_H}\n"
+        "WrapStyle: 0\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        "Style: Top,NanumSquareOTFB00,48,&H00FFFFFF,&H000000FF,"
+        "&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,10,10,375,1\n"
+        "Style: Bottom,NanumSquareOTFB00,48,&H00FFFFFF,&H000000FF,"
+        "&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,10,10,320,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
 
-    entries = []
-    idx = 1
-    for i, (t, text) in enumerate(events):
-        # 종료 시점: 다음 이벤트 시작 (절대 넘지 않음)
-        if i + 1 < len(events):
-            t_end = events[i + 1][0]
-        else:
-            t_end = last_end
-        # 시작과 종료가 같거나 역전이면 스킵
-        if t_end <= t:
-            continue
-        entries.append(
-            f"{idx}\n"
-            f"{_sec_to_srt(t)} --> {_sec_to_srt(t_end)}\n"
-            f"{text}\n"
-        )
-        idx += 1
+    style_names = ["Top", "Bottom"]
+    dialogues = []
+    for si in range(2):
+        for start, end, text, fade in slot_segs[si]:
+            if end <= start:
+                continue
+            s_str = _sec_to_ass(start)
+            e_str = _sec_to_ass(end)
+            prefix = f"{{\\fad(0,{FADE_OUT_MS})}}" if fade else ""
+            dialogues.append((start, f"Dialogue: 0,{s_str},{e_str},{style_names[si]},,0,0,0,,{prefix}{text}"))
 
-    srt_path.write_text('\n'.join(entries), encoding='utf-8')
-    return srt_path
+    dialogues.sort(key=lambda x: x[0])
+    content = header + '\n'.join(d[1] for d in dialogues) + '\n'
+    ass_path.write_text(content, encoding='utf-8-sig')
+    return ass_path
 
 
-def _sec_to_srt(sec: float) -> str:
-    """초 → SRT 시간 포맷 (HH:MM:SS,mmm)."""
+def _sec_to_ass(sec: float) -> str:
+    """초 → ASS 시간 포맷 (H:MM:SS.cc)."""
     h = int(sec // 3600)
     m = int((sec % 3600) // 60)
     s = int(sec % 60)
-    ms = int((sec % 1) * 1000)
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+    cs = int((sec % 1) * 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
 async def _get_duration(file_path: str) -> float:
@@ -185,8 +230,10 @@ async def render_video(
     audio_path: str,
     scenes: list = None,
     whisper_lyrics: list = None,
+    title: str = None,
+    theme: str = None,
 ) -> str:
-    """비디오 클립들을 연결하고 오디오 합성 + 가사 자막."""
+    """비디오 클립들을 연결하고 오디오 합성 + 가사 자막 + 제목 + 테마."""
     out_path = video_path(project_id)
     proj = project_dir(project_id)
 
@@ -211,8 +258,8 @@ async def render_video(
             trim_args = ['-t', f'{scene_durations[i]:.3f}']
         cmd_norm = [
             'ffmpeg', '-y', '-i', p,
-            '-vf', f'scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=decrease,'
-                   f'pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black',
+            '-vf', f'scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase,'
+                   f'crop={TARGET_W}:{TARGET_H}',
             '-r', str(TARGET_FPS),
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-an',
             *trim_args,
@@ -267,29 +314,130 @@ async def render_video(
         concat_tmp.unlink(missing_ok=True)
         concat_tmp = padded
 
-    # 5. 자막 SRT 생성 (비활성화)
-    srt_path = None
-    # if whisper_lyrics or scenes:
-    #     srt_path = _generate_srt(scenes, out_path, whisper_lyrics=whisper_lyrics)
+    # 5. 자막 ASS 생성 (fade-out 지원)
+    ass_path = None
+    if whisper_lyrics or scenes:
+        ass_path = _generate_ass(scenes, out_path, whisper_lyrics=whisper_lyrics)
 
     # 6. 오디오 fade-out (마지막 2초)
     fade_sec = 2.0
     audio_fade = f"afade=t=out:st={audio_dur - fade_sec}:d={fade_sec}" if audio_dur > fade_sec else ""
 
-    # 7. 오디오 합성 + 자막 → 최종 영상
-    if srt_path and srt_path.exists() and srt_path.stat().st_size > 10:
-        srt_escaped = str(srt_path.resolve()).replace('\\', '/').replace(':', r'\:')
+    # 7. 오디오 합성 + 자막 + 제목 → 최종 영상
+    vf_parts = []
+
+    # 7a. 가사 자막 (ASS — NanumSquare Bold, fade-out 포함)
+    if ass_path and ass_path.exists() and ass_path.stat().st_size > 10:
+        ass_escaped = str(ass_path.resolve()).replace('\\', '/').replace(':', r'\:')
+        fonts_escaped = str(_FONTS_DIR.resolve()).replace('\\', '/').replace(':', r'\:')
+        vf_parts.append(
+            f"ass='{ass_escaped}':fontsdir='{fonts_escaped}'"
+        )
+
+    # 7b. 제목 (Gmarket Sans Bold, 상단, 0~3초 + fade-out only)
+    if title:
+        font_escaped = FONT_TITLE.replace('\\', '/').replace(':', r'\:')
+        title_safe = title.replace("\\", "\\\\").replace("'", "\u2019").replace(":", "\\:")
+        # 제목 길이에 따라 폰트 크기 가변 (양쪽 여백 40px 확보)
+        max_w = TARGET_W - 80  # 656px 사용 가능 영역
+        # 한글 ~0.9em, 영문 ~0.5em 기준 추정 폭
+        est_width = sum(0.9 if ord(c) > 127 else 0.5 for c in title_safe)
+        title_fs = min(88, max(48, int(max_w / max(est_width, 1))))
+        border_w = max(3, title_fs // 16)
+        # 0~2.7초 완전 표시, 2.7~3.0초 fade-out
+        fade_start = 2.7
+        fade_end = 3.0
+        vf_parts.append(
+            f"drawtext=fontfile='{font_escaped}'"
+            f":text='{title_safe}'"
+            f":fontsize={title_fs}:fontcolor=#FFF700"
+            f":borderw={border_w}:bordercolor=black@0.8"
+            f":shadowx=3:shadowy=3:shadowcolor=black@0.5"
+            f":x=(w-text_w)/2:y=80"
+            f":enable='between(t,0,{fade_end})'"
+            f":alpha='if(gt(t,{fade_start}),max(({fade_end}-t)/{fade_end - fade_start},0),1)'"
+        )
+
+    # 7c. 테마 (제목 아래, 노란색, 가변 크기, 길면 2줄)
+    if theme and title:
+        # " - " 또는 " — " 뒤쪽만 표시 (앞쪽은 제목과 중복)
+        for sep in [' - ', ' — ', ' – ']:
+            if sep in theme:
+                theme_display = theme.split(sep, 1)[1].strip()
+                break
+        else:
+            theme_display = theme
+
+        def _escape_dt(t):
+            return t.replace("\\", "\\\\").replace("'", "\u2019").replace(":", "\\:")
+
+        def _est_w(t):
+            return sum(0.9 if ord(c) > 127 else 0.5 for c in t)
+
+        # 1) 줄 수 결정 — 폰트 40px 이상 될 때까지 줄 수 늘림
+        MIN_THEME_FS = 40
+        words = theme_display.split()
+        theme_lines = [theme_display]
+
+        for num_lines in range(1, min(len(words), 4) + 1):
+            # N줄 균등 분할 (윗줄이 약간 더 길게)
+            if num_lines == 1:
+                theme_lines = [theme_display]
+            else:
+                theme_lines = []
+                remaining = list(words)
+                for li in range(num_lines):
+                    lines_left = num_lines - li
+                    total_rem = _est_w(' '.join(remaining))
+                    target = total_rem / lines_left * (1.05 if li == 0 else 1.0)
+                    accum = 0
+                    cut = len(remaining)
+                    for wi, wd in enumerate(remaining):
+                        accum += _est_w(wd) + (0.5 if wi < len(remaining) - 1 else 0)
+                        if accum >= target and wi > 0:
+                            cut = wi + 1
+                            break
+                    if li == num_lines - 1:
+                        cut = len(remaining)
+                    theme_lines.append(' '.join(remaining[:cut]))
+                    remaining = remaining[cut:]
+                if remaining:
+                    theme_lines[-1] += ' ' + ' '.join(remaining)
+
+            longest_w = max(_est_w(l) for l in theme_lines)
+            fs = int(max_w / max(longest_w, 1))
+            if fs >= MIN_THEME_FS:
+                break
+
+        # 2) 최종 가장 긴 줄 기준 폰트 크기 (최대 80)
+        longest_w = max(_est_w(l) for l in theme_lines)
+        theme_fs = min(80, max(32, int(max_w / max(longest_w, 1))))
+        theme_bw = max(2, theme_fs // 16)
+        theme_y = 80 + title_fs + 10
+        theme_common = (
+            f":fontcolor=white"
+            f":borderw={theme_bw}:bordercolor=black@0.6"
+            f":shadowx=1:shadowy=1:shadowcolor=black@0.4"
+            f":enable='between(t,0,{fade_end})'"
+            f":alpha='if(gt(t,{fade_start}),max(({fade_end}-t)/{fade_end - fade_start},0),1)'"
+        )
+
+        for li, line in enumerate(theme_lines):
+            y = theme_y + li * (theme_fs + 6)
+            vf_parts.append(
+                f"drawtext=fontfile='{font_escaped}'"
+                f":text='{_escape_dt(line)}'"
+                f":fontsize={theme_fs}"
+                f":x=(w-text_w)/2:y={y}"
+                + theme_common
+            )
+
+    if vf_parts:
         cmd_final = [
             'ffmpeg', '-y',
             '-i', str(concat_tmp),
             '-i', audio_path,
-            '-vf', (
-                f"subtitles='{srt_escaped}'"
-                f":force_style='FontName=Malgun Gothic,FontSize=18,"
-                f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-                f"Outline=2,Shadow=1,Alignment=2,"
-                f"MarginV=60'"
-            ),
+            '-vf', ','.join(vf_parts),
             *(['-af', audio_fade] if audio_fade else []),
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '192k',

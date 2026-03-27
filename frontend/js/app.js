@@ -347,7 +347,17 @@ function showPage(name, skipHash) {
       ? `#result/${window._currentProjectId}`
       : `#${name}`;
     if (location.hash !== hash) {
-      history.pushState(null, '', hash);
+      const prevIsDashboard = !location.hash || location.hash === '#dashboard';
+      if (name === 'dashboard') {
+        // 대시보드로 갈 때는 replace (스택 안 쌓음)
+        history.replaceState(null, '', hash);
+      } else if (prevIsDashboard) {
+        // 대시보드에서 나갈 때만 push (뒤로가기 1번에 대시보드로)
+        history.pushState(null, '', hash);
+      } else {
+        // 비대시보드 → 비대시보드: replace (스택 안 쌓음)
+        history.replaceState(null, '', hash);
+      }
     }
   }
   if (pages[name]) pages[name]();
@@ -396,6 +406,8 @@ window.addEventListener('DOMContentLoaded', () => {
   setTheme(localStorage.getItem('theme') || 'auto');
   loadApiStatus();
   const hash = location.hash.slice(1);
+  // 대시보드를 히스토리 베이스로 깔기 (뒤로가기 시 항상 대시보드)
+  history.replaceState(null, '', '#dashboard');
   if (hash.startsWith('result/')) {
     window._currentProjectId = hash.split('/')[1];
     showPage('result');
@@ -407,6 +419,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('popstate', (e) => {
+  // 모달/라이트박스가 열려있으면 닫기만 (pushState로 열림)
   const lightbox = document.getElementById('lightbox');
   if (lightbox && !lightbox.classList.contains('hidden')) {
     closeLightbox();
@@ -417,15 +430,8 @@ window.addEventListener('popstate', (e) => {
     closeCreateModal();
     return;
   }
-  const hash = location.hash.slice(1);
-  if (hash.startsWith('result/')) {
-    window._currentProjectId = hash.split('/')[1];
-    showPage('result', true);
-  } else if (['guide', 'settings', 'dashboard'].includes(hash)) {
-    showPage(hash, true);
-  } else {
-    showPage('dashboard', true);
-  }
+  // 그 외 뒤로가기 — 대시보드로 이동
+  showPage('dashboard', true);
 });
 
 async function loadApiStatus() {

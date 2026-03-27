@@ -61,7 +61,7 @@ async def gemini_generate_images(prompt: str, **config_kwargs) -> bytes:
                 prompt=prompt,
                 config=types.GenerateImagesConfig(
                     number_of_images=1,
-                    aspect_ratio="3:4",
+                    aspect_ratio="9:16",
                     safety_filter_level="BLOCK_LOW_AND_ABOVE",
                     **config_kwargs,
                 )

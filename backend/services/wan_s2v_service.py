@@ -182,7 +182,8 @@ def _build_s2v_workflow(
     }
 
 
-async def _queue_and_wait(workflow: dict, timeout: int = 3600) -> dict:
+async def _queue_and_wait(workflow: dict, timeout: int = 3600,
+                          abort_check=None) -> dict:
     """ComfyUI에 워크플로우 큐잉하고 완료 대기. S2V는 느리므로 1시간 타임아웃."""
     data = json.dumps({"prompt": workflow}).encode("utf-8")
     req = urllib.request.Request(
@@ -194,7 +195,20 @@ async def _queue_and_wait(workflow: dict, timeout: int = 3600) -> dict:
 
     start = time.time()
     while time.time() - start < timeout:
-        await asyncio.sleep(10)
+        # 0.5초 단위로 abort 체크 (총 10초 대기)
+        for _ in range(20):
+            await asyncio.sleep(0.5)
+            if abort_check and abort_check():
+                try:
+                    _req = urllib.request.Request(
+                        f"{COMFYUI_URL}/interrupt", data=b"",
+                        headers={"Content-Type": "application/json"},
+                        method="POST")
+                    urllib.request.urlopen(_req)
+                except Exception:
+                    pass
+                from backend.services.wan_video_service import _AbortedError
+                raise _AbortedError("파이프라인 중단 요청")
         try:
             resp = await asyncio.to_thread(
                 urllib.request.urlopen,
@@ -276,6 +290,7 @@ async def generate_lipsync_clip(
     has_vocal: bool = True,
     is_vocalist: bool = True,
     shot_type: str = "medium",
+    abort_check=None,
 ) -> str:
     """Wan 2.2 S2V로 립싱크 클립 생성. vocals_path는 분리된 보컬 파일."""
     from backend.utils.audio_utils import extract_audio_segment
@@ -364,7 +379,7 @@ async def generate_lipsync_clip(
         img_name, audio_name, s2v_prompt, seed,
         num_frames=num_frames, output_prefix=prefix)
 
-    await _queue_and_wait(wf, timeout=3600)
+    await _queue_and_wait(wf, timeout=3600, abort_check=abort_check)
     out.parent.mkdir(parents=True, exist_ok=True)
 
     # 48kHz 오디오로 합성 (립싱크는 S2V가 처리, 최종 오디오는 고음질)

@@ -232,6 +232,12 @@ async def _run_auto_generation():
     """중단된 프로젝트 resume 또는 랜덤 테마로 새 작품 생성."""
     from backend.services.pipeline_service import run_pipeline
     from backend.utils.progress import ProgressEmitter, register_emitter
+    from backend.routers.pipeline import _pipeline_lock
+
+    # 다른 파이프라인이 실행 중이면 스킵
+    if _pipeline_lock.locked():
+        print("[Scheduler] 다른 파이프라인 실행 중, 스킵", file=sys.stderr)
+        return
 
     # 서버 재시작으로 중단된 프로젝트가 있으면 resume
     interrupted = await _find_interrupted_project()
@@ -263,8 +269,9 @@ async def _run_auto_generation():
         success = False
         fail_reason = ""
         try:
-            await run_pipeline(project_id, theme, mood, emitter,
-                               resume_from=resume_from, length=length)
+            async with _pipeline_lock:
+                await run_pipeline(project_id, theme, mood, emitter,
+                                   resume_from=resume_from, length=length)
             success = True
         except Exception as e:
             fail_reason = str(e)[:100]
@@ -292,7 +299,8 @@ async def _run_auto_generation():
         success = False
         fail_reason = ""
         try:
-            await run_pipeline(project_id, theme, mood, emitter, length="short")
+            async with _pipeline_lock:
+                await run_pipeline(project_id, theme, mood, emitter, length="short")
             success = True
         except Exception as e:
             fail_reason = str(e)[:100]
@@ -328,9 +336,10 @@ _STARTUP_GRACE_SEC = 30  # 서버 시작 후 30초간 자동 생성 보류 (재�
 async def _generation_loop():
     """작품 자동 생성 루프."""
     global _gen_enabled
-    # 중단된 작품이 있으면 즉시 resume (grace period 없이)
+    # 중단된 작품이 있으면 즉시 resume (스케줄러 활성화 시에만)
+    config = await _get_schedule_config("generation")
     interrupted = await _find_interrupted_project()
-    if interrupted:
+    if interrupted and config.get("enabled"):
         print(f"[Scheduler] 중단된 작품 발견, 즉시 resume (id={interrupted['id'][:8]})",
               file=sys.stderr)
         try:

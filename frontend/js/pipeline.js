@@ -50,7 +50,7 @@ async function regenScene(includeImage) {
   if (result.ok) {
     resetProgressUI(result.from_step || 3);
     if (_wsHandle) _wsHandle.close();
-    _pipelineRunning = true;
+    _pipelineRunning = true; _updateAbortButton(true);
     _pipelineProjectId = id;
     _wsHandle = API.connectWS(id, handlePipelineEvent);
     document.getElementById('result-status').innerHTML = statusBadge('running');
@@ -207,6 +207,7 @@ function handlePipelineEvent(evt) {
     _pipelineProjectId = null;
     if (_wsHandle) { _wsHandle.close(); _wsHandle = null; }
     stopResourceMonitor();
+    _updateAbortButton(false);
     toast('뮤직비디오 완성!', 'success');
     sendNotification('영상 완성!', '뮤직비디오가 생성되었습니다.', () => {
       showPage('result');
@@ -222,11 +223,28 @@ function handlePipelineEvent(evt) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  if (evt.type === 'aborted') {
+    _pipelineRunning = false;
+    _pipelineProjectId = null;
+    if (_wsHandle) { _wsHandle.close(); _wsHandle = null; }
+    stopResourceMonitor();
+    _updateAbortButton(false);
+    // running/pending 슬롯의 스피너 제거
+    document.querySelectorAll('.clip-slot.clip-running, .clip-slot.clip-pending').forEach(el => {
+      el.className = 'clip-slot clip-pending';
+      const overlay = el.querySelector('.clip-overlay');
+      if (overlay) overlay.innerHTML = '<span class="clip-wait-text">중단됨</span>';
+    });
+    document.getElementById('result-status').innerHTML = statusBadge('failed');
+    toast('파이프라인이 중단되었습니다.', 'success');
+  }
+
   if (evt.type === 'error') {
     _pipelineRunning = false;
     _pipelineProjectId = null;
     if (_wsHandle) { _wsHandle.close(); _wsHandle = null; }
     stopResourceMonitor();
+    _updateAbortButton(false);
     markStepFailed(evt.step, evt.message);
     document.getElementById('result-status').innerHTML = statusBadge('failed');
     toast(`오류: ${evt.message}`, 'error');
@@ -264,11 +282,11 @@ function resetProgressUI(fromStep = 1) {
   }
   if (fromStep <= 3) {
     const imgEl = document.getElementById('image-previews');
-    if (imgEl) imgEl.innerHTML = '';
+    if (imgEl) { imgEl.innerHTML = ''; imgEl._prevKey = null; }
   }
   if (fromStep <= 4) {
     const clipEl = document.getElementById('clip-previews');
-    if (clipEl) clipEl.innerHTML = '';
+    if (clipEl) { clipEl.innerHTML = ''; clipEl._prevDoneKey = null; clipEl._prevKey = null; }
   }
 }
 
@@ -607,10 +625,11 @@ async function _showLightboxItemInner() {
   const overlay = document.getElementById('lightbox-status-overlay');
 
   if (clipStatus === 'done' && url.endsWith('.mp4')) {
-    // 완성된 영상 클립
+    // 완성된 영상 클립 — 오디오는 별도 audio element로 싱크 재생
     img.classList.add('hidden');
     vid.classList.remove('hidden');
     vid.src = url + bust;
+    vid.muted = true;
     if (overlay) overlay.classList.add('hidden');
   } else if (isImage) {
     // STEP 3 이미지

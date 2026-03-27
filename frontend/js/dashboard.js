@@ -194,7 +194,7 @@ async function loadResult() {
       }
       // step4 클립
       if (s.step_no === 4 && data.clip_slots) {
-        _renderClipSlots(document.getElementById('clip-previews'), data.clip_slots);
+        _renderClipSlots('clip-previews', data.clip_slots);
       } else if (s.step_no === 4 && data.clip_count) {
         const urls = Array.from({ length: data.clip_count }, (_, i) =>
           `/storage/projects/${id}/clips/clip_${String(i+1).padStart(2,'0')}.mp4`);
@@ -228,8 +228,11 @@ async function loadResult() {
     }
   }
 
-  // 완료/실패 시 재시도 버튼 + 상태 리셋
+  // 중단 버튼 표시/숨김
   const isRunning = project.status === 'running';
+  _updateAbortButton(isRunning);
+
+  // 완료/실패 시 재시도 버튼 + 상태 리셋
   if (!isRunning) {
     _pipelineRunning = false;
     if (_wsHandle) { _wsHandle.close(); _wsHandle = null; }
@@ -262,6 +265,23 @@ async function loadResult() {
 
 async function retryProject(id) {
   retryFromStep(id, 0);
+}
+
+async function abortPipeline() {
+  const id = window._currentProjectId;
+  if (!id) return;
+  if (!confirm('파이프라인을 중단하시겠습니까?')) return;
+  const result = await API.post(`/pipeline/abort/${id}`, {});
+  if (result.ok) {
+    toast('중단 요청 전송됨', 'success');
+  } else {
+    toast(result.error || '중단 실패', 'error');
+  }
+}
+
+function _updateAbortButton(isRunning) {
+  const btn = document.getElementById('abort-pipeline-btn');
+  if (btn) btn.classList.toggle('hidden', !isRunning);
 }
 
 async function deleteProject() {

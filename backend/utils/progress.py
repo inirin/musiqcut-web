@@ -25,6 +25,7 @@ class ProgressEmitter:
         self.project_id = project_id
         self._clients: set[WebSocket] = set()
         self._done = False
+        self._abort = False  # 중단 요청 플래그
         self._step_starts: dict[int, str] = {}
         # 스텝별 최신 이벤트 (재접속 시 전체 상태 동기화)
         self._latest_events: dict[int, dict] = {}  # step_no → event
