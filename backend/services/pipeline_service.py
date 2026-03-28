@@ -861,6 +861,57 @@ async def _run_pipeline_steps(
                 for j, idx in enumerate(wan_indices):
                     clip_files[idx] = wan_results[j]
 
+            # 누락된 클립 재생성 (실행 중 재생성 요청으로 삭제된 클립)
+            missing = [(i, sc) for i, sc in enumerate(scenes)
+                       if not clip_files[i] or not Path(clip_files[i]).exists()]
+            if missing:
+                print(f"[STEP4] 누락 클립 {len(missing)}개 재생성: "
+                      f"{[sc.scene_no for _, sc in missing]}", file=sys.stderr)
+                for idx, scene in missing:
+                    _current_clip_idx = idx
+                    await _step4_progress_update()
+                    sno = scene.scene_no
+                    if idx in s2v_indices and use_s2v and vocals_path:
+                        try:
+                            start_sec = scene.start_sec if scene.start_sec > 0 else idx * clip_duration
+                            scene_dur = scene.duration if scene.duration > 0 else clip_duration
+                            result = await s2v_generate_lipsync(
+                                project_id, sno, vocals_path,
+                                scene_start_sec=start_sec,
+                                clip_duration=scene_dur,
+                                prompt=getattr(scene, 'image_prompt', scene.description),
+                                has_vocal=_has_vocals(scene),
+                                is_vocalist=getattr(scene, 'is_vocalist', True),
+                                shot_type=getattr(scene, 'shot_type', 'medium'),
+                                abort_check=lambda: emitter._abort)
+                            clip_files[idx] = result
+                        except Exception as e:
+                            print(f"[STEP4] S2V 재생성 실패 (장면 {sno}), 폴백: {e}",
+                                  file=sys.stderr)
+                            from backend.services.wan_video_service import _ffmpeg_still_video
+                            still_out = clip_path(project_id, sno)
+                            await _ffmpeg_still_video(image_files[idx], still_out,
+                                                     duration=scene.duration or clip_duration)
+                            clip_files[idx] = str(still_out)
+                    else:
+                        # I2V 단건 재생성
+                        try:
+                            wan_result = await wan_generate_clips(
+                                project_id, [scene], [image_files[idx]],
+                                abort_check=lambda: emitter._abort)
+                            clip_files[idx] = wan_result[0]
+                        except Exception as e:
+                            print(f"[STEP4] I2V 재생성 실패 (장면 {sno}), 폴백: {e}",
+                                  file=sys.stderr)
+                            from backend.services.wan_video_service import _ffmpeg_still_video
+                            still_out = clip_path(project_id, sno)
+                            await _ffmpeg_still_video(image_files[idx], still_out,
+                                                     duration=scene.duration or clip_duration)
+                            clip_files[idx] = str(still_out)
+                    await _step4_progress_update()
+                    if emitter._abort:
+                        raise _PipelineAbortError("파이프라인 중단 요청")
+
             clip_files = [f for f in clip_files if f]  # None 제거
 
             # 최종 clip_slots (뱃지 표시용)

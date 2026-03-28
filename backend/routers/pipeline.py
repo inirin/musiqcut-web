@@ -52,20 +52,11 @@ async def random_theme():
 @router.post("/{project_id}/regenerate-scene/{scene_no}")
 async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_image: bool = True):
     """특정 장면 재생성 — 파일 삭제 후 Step 3/4부터 resume.
-    진행 중이면 현재 클립 완료 후 중단 → 재생성 시작."""
+    진행 중이면 파일만 삭제 (abort 안 함, 루프가 자동 재생성)."""
     global _running_project_id
 
     from pathlib import Path
     from backend.utils.file_manager import image_path, clip_path
-
-    # 진행 중인 파이프라인이 있으면 abort 요청
-    existing_emitter = get_emitter(project_id)
-    is_aborting = False
-    if _pipeline_lock.locked() and existing_emitter and not existing_emitter.done:
-        existing_emitter._abort = True
-        is_aborting = True
-        print(f"[Regen] 진행 중인 파이프라인에 중단 요청 (project={project_id})",
-              file=__import__('sys').stderr)
 
     # 해당 장면 파일 삭제
     deleted = []
@@ -83,15 +74,49 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
         clip.unlink()
         deleted.append(f"clip_{scene_no:02d}")
 
+    print(f"[Regen] 장면 {scene_no} 삭제: {deleted}", file=__import__('sys').stderr)
+
+    # 파이프라인이 같은 프로젝트에서 실행 중이면 파일만 삭제하고 끝
+    # (루프가 해당 장면에 도달하면 파일 없으니 자동 재생성)
+    existing_emitter = get_emitter(project_id)
+    if _pipeline_lock.locked() and existing_emitter and not existing_emitter.done:
+        # DB의 clip_slots에서 해당 슬롯을 pending으로 업데이트
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                import json as _json
+                row = await (await db.execute(
+                    "SELECT output_data FROM pipeline_steps "
+                    "WHERE project_id=? AND step_no=4 AND status='running' "
+                    "ORDER BY id DESC LIMIT 1", (project_id,)
+                )).fetchone()
+                if row and row[0]:
+                    data = _json.loads(row[0])
+                    slots = data.get("clip_slots", [])
+                    idx = scene_no - 1
+                    if 0 <= idx < len(slots):
+                        slots[idx]["status"] = "pending"
+                        slots[idx].pop("url", None)
+                        await db.execute(
+                            "UPDATE pipeline_steps SET output_data=? "
+                            "WHERE project_id=? AND step_no=4 AND status='running'",
+                            (_json.dumps(data, ensure_ascii=False), project_id))
+                        await db.commit()
+        except Exception as e:
+            print(f"[Regen] DB 슬롯 업데이트 실패: {e}", file=__import__('sys').stderr)
+
+        print(f"[Regen] 파이프라인 실행 중 — 파일만 삭제, 루프에서 자동 재생성 예정",
+              file=__import__('sys').stderr)
+        return {"ok": True, "project_id": project_id, "scene_no": scene_no,
+                "from_step": from_step, "deleted": deleted,
+                "queued": True}
+
     # 비디오도 삭제 (Step 5 재합성 필요)
     video_dir = Path(f"storage/projects/{project_id}/video")
     if video_dir.exists():
         import shutil
         shutil.rmtree(str(video_dir), ignore_errors=True)
 
-    print(f"[Regen] 장면 {scene_no} 삭제: {deleted}", file=__import__('sys').stderr)
-
-    # DB 스텝 초기화 — Step 5(영상 합성)만 삭제 + from_step 이후 스텝 리셋
+    # DB 스텝 초기화 — Step 5(영상 합성)만 삭제
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         row = await db.execute("SELECT theme, mood, length FROM projects WHERE id=?", (project_id,))
@@ -100,7 +125,6 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
             return {"ok": False, "error": "프로젝트를 찾을 수 없습니다."}
         theme, mood, length = row["theme"], row["mood"], row["length"] or "short"
 
-        # Step 3/4는 유지 (파일 단위로 이미 삭제됨), Step 5만 삭제
         await db.execute(
             "DELETE FROM pipeline_steps WHERE project_id=? AND step_no=5",
             (project_id,))
@@ -123,7 +147,7 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
     asyncio.create_task(_run())
     return {"ok": True, "project_id": project_id, "scene_no": scene_no,
             "from_step": from_step, "deleted": deleted,
-            "aborting_current": is_aborting}
+            "queued": False}
 
 
 @router.post("/run")

@@ -171,7 +171,24 @@ async function regenScene(includeImage) {
   closeLightbox();
   toast(`장면 ${sceneNo} ${label} 재생성 시작...`);
   const result = await API.post(`/pipeline/${id}/regenerate-scene/${sceneNo}?include_image=${includeImage}`, {});
-  if (result.ok) {
+  if (result.ok && result.queued) {
+    // 파이프라인 실행 중 — 파일만 삭제됨, 해당 슬롯을 대기중으로 업데이트
+    const clipContainer = document.getElementById('clip-previews');
+    if (clipContainer) {
+      const slots = clipContainer.querySelectorAll('.clip-slot, .scene-thumb');
+      const idx = sceneNo - 1;
+      if (slots[idx]) {
+        const imgUrl = slots[idx].querySelector('img')?.src || slots[idx].querySelector('video')?.poster || '';
+        const badge = slots[idx].querySelector('.clip-badge')?.outerHTML || '';
+        slots[idx].outerHTML = `<div class="clip-slot clip-pending" data-lb-idx="${idx}">
+          <img src="${imgUrl}">
+          <div class="clip-overlay"><span class="clip-wait-text">대기중</span></div>
+          ${badge}
+        </div>`;
+      }
+    }
+    toast(`장면 ${sceneNo} 재생성 대기 중 (현재 클립 완료 후 자동 실행)`, 'success');
+  } else if (result.ok) {
     resetProgressUI(result.from_step || 3);
     if (_wsHandle) _wsHandle.close();
     _pipelineRunning = true; _updateAbortButton(true);
