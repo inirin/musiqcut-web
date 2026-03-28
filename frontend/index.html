@@ -235,7 +235,7 @@
           </div>
           <p class="guide-text">
             AI 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초.
-            보컬 분리 → 음성 인식으로 단어별 정밀 타이밍 추출 → AI가 오타 보정.
+            보컬 분리 → 음성 인식으로 단어별 정밀 타이밍 추출 (0.1초 미만 노이즈 필터링) → AI가 오타 보정 + 누락 단어 복원.
             보컬 감지 실패(50% 미만) 시 Step 1부터 새 스토리/가사/음악으로 자동 재시도 (최대 2회).
           </p>
         </div>
@@ -585,12 +585,12 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=1774670000"></script>
-<script src="/js/dashboard.js?v=1774670000"></script>
-<script src="/js/pipeline.js?v=1774670000"></script>
-<script src="/js/feedback.js?v=1774670000"></script>
-<script src="/js/channel.js?v=1774670000"></script>
-<script src="/js/settings.js?v=1774670000"></script>
+<script src="/js/app.js?v=1774671000"></script>
+<script src="/js/dashboard.js?v=1774671000"></script>
+<script src="/js/pipeline.js?v=1774671000"></script>
+<script src="/js/feedback.js?v=1774671000"></script>
+<script src="/js/channel.js?v=1774671000"></script>
+<script src="/js/settings.js?v=1774671000"></script>
 
 </body>
 </html>
