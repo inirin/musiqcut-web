@@ -9,15 +9,15 @@ class Settings(BaseSettings):
 
     youtube_client_id: str = ""
     youtube_client_secret: str = ""
-    youtube_redirect_uri: str = "http://localhost:8000/api/upload/youtube/callback"
+    youtube_redirect_uri: str = "https://musiqcut.com/api/upload/youtube/callback"
 
     instagram_app_id: str = ""
     instagram_app_secret: str = ""
-    instagram_redirect_uri: str = "http://localhost:8000/api/upload/instagram/callback"
+    instagram_redirect_uri: str = "https://musiqcut.com/api/upload/instagram/callback"
 
     tiktok_client_key: str = ""
     tiktok_client_secret: str = ""
-    tiktok_redirect_uri: str = "http://localhost:8000/api/upload/tiktok/callback"
+    tiktok_redirect_uri: str = "https://musiqcut.com/api/upload/tiktok/callback"
 
     app_host: str = "0.0.0.0"
     app_port: int = 8000
