@@ -201,123 +201,106 @@
 
     <!-- ── 사용 가이드 ── -->
     <div data-page="guide" class="hidden">
-      <h1 style="font-size:1.4rem;margin-bottom:20px">파이프라인 가이드</h1>
-
+      <h1 style="font-size:1.4rem;margin-bottom:20px">사용 가이드</h1>
 
       <div class="guide-intro">
-        <div class="card-title">작품 만들기</div>
+        <div class="card-title">뮤직비디오 만들기</div>
         <p class="guide-text">
-          테마/스토리만 입력하면 AI가 분위기, 아트 스타일, 캐릭터, 음악까지 모두 자동으로 결정합니다.
+          테마만 입력하면 AI가 스토리, 음악, 이미지, 영상, 자막까지 모두 자동으로 만들어줍니다.<br>
+          완성까지 약 30~50분 소요되며, 진행 상황을 실시간으로 확인할 수 있습니다.
         </p>
         <div class="guide-table">
-          <div class="guide-row"><span class="guide-label">숏폼</span><span>15~30초 · 가사 2~3줄 · 바로 보컬 시작 · 다채로운 구성</span></div>
+          <div class="guide-row"><span class="guide-label">영상 길이</span><span>15~30초 숏폼</span></div>
+          <div class="guide-row"><span class="guide-label">해상도</span><span>세로 9:16 (모바일 최적)</span></div>
         </div>
       </div>
 
       <div class="guide-flow">
         <div class="card">
-          <div class="card-title">✍️ STEP 1 — 스토리/컨셉 생성</div>
-          <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> 테마 + 분위기 + 트렌드 힌트 (자동 생성 시)</div>
-            <div class="guide-io-out"><span>출력</span> 제목, 가사, 작곡 지시, 보컬 스타일, 아트 스타일, 캐릭터 프로필, 해시태그</div>
-          </div>
+          <div class="card-title">✍️ STEP 1 — 스토리 만들기</div>
           <p class="guide-text">
-            테마에서 장르/분위기/아트 스타일을 자동 판단하고, 캐릭터 외형 프로필(최대 3명)을 상세 정의합니다.
-            트렌드 힌트가 있으면 검색으로 대상(인물/사물/장소 등)의 실제 외형을 파악하여 캐릭터/소품/배경에 반영합니다.
-            업로드용 해시태그 5개도 함께 생성됩니다.
+            입력한 테마를 바탕으로 AI가 제목, 가사, 캐릭터 디자인, 그림체, 음악 스타일을 결정합니다.
+            업로드용 해시태그도 함께 생성됩니다.
           </p>
         </div>
         <div class="card">
-          <div class="card-title">🎵 STEP 2 — 음악 생성</div>
-          <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> STEP 1의 가사 + 작곡 지시</div>
-            <div class="guide-io-out"><span>출력</span> MP3 음원 + 단어별 정밀 타이밍 + 장면 수 자동 결정</div>
-          </div>
+          <div class="card-title">🎵 STEP 2 — 음악 만들기</div>
           <p class="guide-text">
-            AI 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초.
-            보컬 분리 → 음성 인식으로 단어별 정밀 타이밍 추출 (0.1초 미만 노이즈 필터링) → AI가 오타 보정 + 누락 단어 복원.
-            보컬 감지 실패(50% 미만) 시 Step 1부터 새 스토리/가사/음악으로 자동 재시도 (최대 2회).
+            AI가 가사에 맞는 음악을 작곡하고, 가사의 단어별 타이밍을 분석합니다.
+            이 타이밍이 자막과 장면 전환의 기준이 됩니다.
           </p>
         </div>
         <div class="card">
-          <div class="card-title">🖼️ STEP 3 — 이미지 생성</div>
-          <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> STEP 1의 스토리 + STEP 2에서 결정된 장면 수</div>
-            <div class="guide-io-out"><span>출력</span> 장면별 설명/프롬프트 + PNG 이미지 (576×1024 세로 9:16)</div>
-          </div>
+          <div class="card-title">🖼️ STEP 3 — 장면 이미지 생성</div>
           <p class="guide-text">
-            가사 타이밍 + 캐릭터 프로필을 기반으로 장면을 구성합니다.
-            STEP 1에서 결정된 아트 스타일이 모든 장면에 일관 적용됩니다.
+            가사 흐름에 맞춰 장면을 구성하고, 각 장면의 이미지를 생성합니다.
+            STEP 1에서 정한 그림체와 캐릭터가 모든 장면에 일관되게 적용됩니다.
           </p>
         </div>
         <div class="card">
           <div class="card-title">🎞️ STEP 4 — 영상 클립 생성</div>
-          <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> STEP 3의 이미지 + 장면 설명 + 보컬 오디오</div>
-            <div class="guide-io-out"><span>출력</span> 장면별 MP4 영상 클립 (576×1024 9:16, ~5초)</div>
-          </div>
           <p class="guide-text">
-            보컬 타이밍 + 보컬 주체 여부(is_vocalist)로 엔진 자동 분기.
+            각 이미지를 ~5초짜리 움직이는 영상으로 변환합니다.
+            노래하는 캐릭터 장면은 입 모양이 음악에 맞춰 움직이는 립싱크가 적용됩니다.
           </p>
           <div class="guide-detail">
-            <div class="guide-detail-title">엔진 분기</div>
-            보컬 + 보컬 주체 → 오디오 립싱크 (~17분/클립)<br>
-            비보컬/비주체 → 모션 영상 (고속)
-          </div>
-          <div class="guide-detail">
-            <div class="guide-detail-title">폴백 전략</div>
-            립싱크 실패 → 정지 이미지 영상 · 모션 실패 → 정지 이미지 영상
+            <div class="guide-detail-title">소요 시간</div>
+            립싱크 장면: 약 17분/클립 · 일반 장면: 약 2분/클립
           </div>
         </div>
         <div class="card">
-          <div class="card-title">🎬 STEP 5 — 최종 영상 합성</div>
-          <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> STEP 4의 영상 클립 + STEP 2의 음원</div>
-            <div class="guide-io-out"><span>출력</span> 최종 MP4 뮤직비디오</div>
-          </div>
+          <div class="card-title">🎬 STEP 5 — 최종 영상 완성</div>
           <p class="guide-text">
-            클립 해상도 정규화 (736×1280) + 장면 trim + 24fps 통일 → 오디오 합성 + fade-out.
-            제목/테마 자막 (어그로체) + 노래방 스타일 가사 자막 (카페24 단정해).
+            모든 클립을 이어붙이고 음악을 합성하여 최종 뮤직비디오를 완성합니다.
+            제목/테마 자막과 노래방 스타일 가사 자막이 자동으로 들어갑니다.
           </p>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">💬 피드백 시스템</div>
+        <div class="card-title">🔄 재생성</div>
         <ul class="guide-notes">
-          <li>완성된 작품에 👍/👎 + 피드백 가능</li>
-          <li>각 스텝(스토리/음악)과 클립별로도 피드백 가능</li>
-        </ul>
-      </div>
-      <div class="card">
-        <div class="card-title">⏰ 자동 생성 스케줄러</div>
-        <ul class="guide-notes">
-          <li>설정한 간격(기본 2시간)마다 실시간 트렌드/뉴스 기반으로 테마를 생성하여 자동 작품 제작</li>
-          <li>검색으로 트렌드 맥락 파악 → 이야기 잠재력 기준 소재 선택 (니치/전문 소재도 가능)</li>
-          <li>최근 30개 작품과 중복 소재 자동 방지 (같은 뉴스 영감 차단)</li>
-          <li>서버 재시작 시 중단된 작품 자동 resume, 스케줄러 비정상 종료 시 자동 복구</li>
-          <li>설정 페이지에서 활성화/간격 조정 가능</li>
-        </ul>
-      </div>
-      <div class="card">
-        <div class="card-title">📤 업로드 시스템</div>
-        <ul class="guide-notes">
-          <li>YouTube, Instagram, TikTok 계정 연동 후 수동/자동 업로드</li>
-          <li>플랫폼별 제목 포맷 자동 적용 (YouTube: 하이픈 구분, Instagram/TikTok: 줄바꿈)</li>
-          <li>해시태그가 설명(description)에 자동 포함</li>
-          <li>중복 업로드 방지 (플랫폼별 1회)</li>
+          <li>마음에 안 드는 장면을 클릭하여 해당 장면만 다시 만들 수 있습니다</li>
+          <li>이미지만 재생성하거나, 이미지+영상 클립 모두 재생성할 수 있습니다</li>
+          <li>영상 생성 중에도 다른 장면의 재생성을 요청할 수 있습니다 (대기 후 자동 처리)</li>
+          <li>실패한 단계부터 재시도할 수 있으며, 이전 단계 결과는 유지됩니다</li>
         </ul>
       </div>
 
       <div class="card">
-        <div class="card-title">참고 사항</div>
+        <div class="card-title">⏰ 자동 생성</div>
         <ul class="guide-notes">
-          <li>한 번에 하나의 작업만 실행 가능합니다 (GPU/API 보호)</li>
-          <li>실패한 스텝부터 재시도할 수 있으며, 이전 스텝의 결과는 캐시됩니다</li>
-          <li>이전 스텝부터 재시도하면 이후 스텝은 자동으로 새로 생성됩니다</li>
-          <li>특정 장면만 재생성 가능 (이미지+클립 또는 클립만)</li>
-          <li>STEP 4 진행 중 리소스 모니터로 GPU 활용 상태를 확인할 수 있습니다</li>
-          <li>도메인: musiqcut.com (Cloudflare Tunnel + Access 인증)</li>
+          <li>설정에서 켜면, 정해진 간격마다 실시간 트렌드/뉴스를 기반으로 자동 작품 제작</li>
+          <li>같은 소재가 중복 선택되지 않도록 최근 30개 작품을 체크합니다</li>
+          <li>생성 간격은 설정 페이지에서 조정할 수 있습니다</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📤 채널 업로드</div>
+        <ul class="guide-notes">
+          <li>설정에서 YouTube, Instagram, TikTok 계정을 연결할 수 있습니다</li>
+          <li>완성된 작품을 원하는 플랫폼에 수동 업로드하거나, 자동 업로드를 켤 수 있습니다</li>
+          <li>제목과 해시태그가 플랫폼에 맞게 자동 포맷됩니다</li>
+          <li>같은 작품은 플랫폼당 한 번만 업로드됩니다</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💬 피드백</div>
+        <ul class="guide-notes">
+          <li>완성된 작품에 👍/👎 + 의견을 남길 수 있습니다</li>
+          <li>각 단계(스토리/음악)와 개별 클립에도 피드백 가능합니다</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">알아두면 좋은 것</div>
+        <ul class="guide-notes">
+          <li>한 번에 하나의 작품만 생성할 수 있습니다</li>
+          <li>STEP 4(영상 클립) 진행 중 GPU 사용량을 실시간 모니터링할 수 있습니다</li>
+          <li>작품 정보에서 해시태그를 클릭하면 텍스트가 선택되어 복사하기 편합니다</li>
+          <li>설정 페이지에서 API 키 연결 상태를 확인하세요</li>
         </ul>
       </div>
     </div>
@@ -585,12 +568,12 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=1774671000"></script>
-<script src="/js/dashboard.js?v=1774671000"></script>
-<script src="/js/pipeline.js?v=1774671000"></script>
-<script src="/js/feedback.js?v=1774671000"></script>
-<script src="/js/channel.js?v=1774671000"></script>
-<script src="/js/settings.js?v=1774671000"></script>
+<script src="/js/app.js?v=1774672000"></script>
+<script src="/js/dashboard.js?v=1774672000"></script>
+<script src="/js/pipeline.js?v=1774672000"></script>
+<script src="/js/feedback.js?v=1774672000"></script>
+<script src="/js/channel.js?v=1774672000"></script>
+<script src="/js/settings.js?v=1774672000"></script>
 
 </body>
 </html>
