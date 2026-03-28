@@ -35,7 +35,7 @@ async def extract_lyrics_timestamps(
     all_words = []
     for seg in raw_segments:
         for w in seg.get("words", []):
-            if w["text"].strip():
+            if w["text"].strip() and w.get("end", 0) - w.get("start", 0) >= 0.1:
                 all_words.append(w)
     print(f"[LyricsSync] Whisper 단어 {len(all_words)}개 추출", file=sys.stderr)
 

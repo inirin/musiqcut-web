@@ -188,9 +188,8 @@ function isLipSync(meta) {
   /** _has_vocal (Whisper 타이밍) 우선 → vocal_lines 텍스트 폴백 */
   const hasVocal = meta._has_vocal !== undefined ? meta._has_vocal
     : (meta.vocal_lines || []).some(l => l.trim() && !_NON_VOCAL.has(l.trim()));
-  const shot = meta.shot_type || 'medium';
   const isVocalist = meta.is_vocalist !== undefined ? meta.is_vocalist : false;
-  return hasVocal && (shot === 'closeup' || shot === 'medium') && isVocalist;
+  return hasVocal && isVocalist;
 }
 
 // hasVocalInScene 제거 — 뱃지는 isLipSync로 통일

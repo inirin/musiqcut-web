@@ -217,71 +217,67 @@
       <div class="guide-flow">
         <div class="card">
           <div class="card-title">✍️ STEP 1 — 스토리/컨셉 생성</div>
-          <div class="guide-api">Gemini 2.5 Flash + Google Search grounding · Google Cloud API</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> 테마 + 분위기 + 트렌드 힌트 (자동 생성 시)</div>
-            <div class="guide-io-out"><span>출력</span> 제목, 가사, 작곡 지시, 보컬 스타일, 아트 스타일, 캐릭터 프로필</div>
+            <div class="guide-io-out"><span>출력</span> 제목, 가사, 작곡 지시, 보컬 스타일, 아트 스타일, 캐릭터 프로필, 해시태그</div>
           </div>
           <p class="guide-text">
-            테마에서 분위기/아트 스타일을 자동 판단하고, 캐릭터 외형 프로필(최대 3명)을 상세 정의합니다.
-            트렌드 힌트가 있으면 Google 검색으로 실존 인물/작품을 파악하여 캐릭터 외형·보컬·아트 스타일에 반영합니다 (고유명사는 제목/가사에 사용하지 않음).
+            테마에서 장르/분위기/아트 스타일을 자동 판단하고, 캐릭터 외형 프로필(최대 3명)을 상세 정의합니다.
+            트렌드 힌트가 있으면 검색으로 대상(인물/사물/장소 등)의 실제 외형을 파악하여 캐릭터/소품/배경에 반영합니다.
+            업로드용 해시태그 5개도 함께 생성됩니다.
           </p>
         </div>
         <div class="card">
           <div class="card-title">🎵 STEP 2 — 음악 생성</div>
-          <div class="guide-api">Suno AI v3.5 · 외부 API</div>
           <div class="guide-io">
-            <div class="guide-io-in"><span>입력</span> STEP 1의 스토리/컨셉 + 작곡 지시</div>
-            <div class="guide-io-out"><span>출력</span> MP3 음원 + 단어별 정밀 타이밍 + 5초 단위 세그먼트 → 장면 수 자동 결정</div>
+            <div class="guide-io-in"><span>입력</span> STEP 1의 가사 + 작곡 지시</div>
+            <div class="guide-io-out"><span>출력</span> MP3 음원 + 단어별 정밀 타이밍 + 장면 수 자동 결정</div>
           </div>
           <p class="guide-text">
-            Suno v3.5가 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초.
-            Demucs 보컬 분리 → Whisper large-v3 전사 + whisperx forced alignment(wav2vec2)로 단어별 정밀 타이밍 추출 → Gemini Flash가 오타 보정.
+            AI 작곡 → 인트로 자동 트림(보컬 시작점 감지) → 15~30초.
+            보컬 분리 → 음성 인식으로 단어별 정밀 타이밍 추출 → AI가 오타 보정.
             보컬 감지 실패(50% 미만) 시 Step 1부터 새 스토리/가사/음악으로 자동 재시도 (최대 2회).
           </p>
         </div>
         <div class="card">
           <div class="card-title">🖼️ STEP 3 — 이미지 생성</div>
-          <div class="guide-api">Gemini 2.5 Flash (장면 구성) + Imagen 4 (T2I) · Google Cloud API</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 1의 스토리 + STEP 2에서 결정된 장면 수</div>
             <div class="guide-io-out"><span>출력</span> 장면별 설명/프롬프트 + PNG 이미지 (576×1024 세로 9:16)</div>
           </div>
           <p class="guide-text">
-            Whisper 가사 싱크 타이밍 + 캐릭터 프로필을 기반으로 장면을 구성합니다.
+            가사 타이밍 + 캐릭터 프로필을 기반으로 장면을 구성합니다.
             STEP 1에서 결정된 아트 스타일이 모든 장면에 일관 적용됩니다.
           </p>
         </div>
         <div class="card">
           <div class="card-title">🎞️ STEP 4 — 영상 클립 생성</div>
-          <div class="guide-api">Wan 2.2 S2V (립싱크) + Wan 2.2 I2V (모션) · ComfyUI · 로컬 GPU</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 3의 이미지 + 장면 설명 + 보컬 오디오</div>
             <div class="guide-io-out"><span>출력</span> 장면별 MP4 영상 클립 (576×1024 9:16, ~5초)</div>
           </div>
           <p class="guide-text">
-            Whisper 보컬 타이밍 + 보컬 주체 여부(is_vocalist) + 샷 타입으로 엔진 자동 분기.
-            보컬 주체의 클로즈업/미디엄은 Wav2Vec2 기반 립싱크, 나머지는 모션 영상.
+            보컬 타이밍 + 보컬 주체 여부(is_vocalist)로 엔진 자동 분기.
           </p>
           <div class="guide-detail">
             <div class="guide-detail-title">엔진 분기</div>
-            보컬 주체 + 클로즈업/미디엄 → Wan 2.2 S2V (Wav2Vec2 오디오 립싱크, ~17분/클립)<br>
-            와이드/비보컬/비주체 → Wan 2.2 I2V (환경 모션, Lightning LoRA 고속)
+            보컬 + 보컬 주체 → 오디오 립싱크 (~17분/클립)<br>
+            비보컬/비주체 → 모션 영상 (고속)
           </div>
           <div class="guide-detail">
             <div class="guide-detail-title">폴백 전략</div>
-            S2V 실패 → 정지 이미지 영상 · Wan I2V 실패 → 정지 이미지 영상
+            립싱크 실패 → 정지 이미지 영상 · 모션 실패 → 정지 이미지 영상
           </div>
         </div>
         <div class="card">
           <div class="card-title">🎬 STEP 5 — 최종 영상 합성</div>
-          <div class="guide-api">FFmpeg · 로컬</div>
           <div class="guide-io">
             <div class="guide-io-in"><span>입력</span> STEP 4의 영상 클립 + STEP 2의 음원</div>
             <div class="guide-io-out"><span>출력</span> 최종 MP4 뮤직비디오</div>
           </div>
           <p class="guide-text">
-            클립 해상도 정규화 (736×1280) + 장면 duration 정밀 trim + FPS 통일 (24fps) → 오디오 합성 + 마지막 2초 fade-out → faststart 최적화.
+            클립 해상도 정규화 (736×1280) + 장면 trim + 24fps 통일 → 오디오 합성 + fade-out.
+            제목/테마 자막 (어그로체) + 노래방 스타일 가사 자막 (카페24 단정해).
           </p>
         </div>
       </div>
@@ -296,10 +292,20 @@
       <div class="card">
         <div class="card-title">⏰ 자동 생성 스케줄러</div>
         <ul class="guide-notes">
-          <li>설정한 간격(기본 2시간)마다 Google Trends 실시간 키워드 기반으로 테마를 생성하여 자동 작품 제작</li>
-          <li>Gemini Google Search grounding으로 트렌드 맥락 파악 → 구체적 상황 기반 테마 생성</li>
-          <li>서버 재시작 시 중단된 작품 자동 resume, 보컬 감지 실패 시 Step 1부터 자동 재시도</li>
+          <li>설정한 간격(기본 2시간)마다 실시간 트렌드/뉴스 기반으로 테마를 생성하여 자동 작품 제작</li>
+          <li>검색으로 트렌드 맥락 파악 → 이야기 잠재력 기준 소재 선택 (니치/전문 소재도 가능)</li>
+          <li>최근 30개 작품과 중복 소재 자동 방지 (같은 뉴스 영감 차단)</li>
+          <li>서버 재시작 시 중단된 작품 자동 resume, 스케줄러 비정상 종료 시 자동 복구</li>
           <li>설정 페이지에서 활성화/간격 조정 가능</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">📤 업로드 시스템</div>
+        <ul class="guide-notes">
+          <li>YouTube, Instagram, TikTok 계정 연동 후 수동/자동 업로드</li>
+          <li>플랫폼별 제목 포맷 자동 적용 (YouTube: 하이픈 구분, Instagram/TikTok: 줄바꿈)</li>
+          <li>해시태그가 설명(description)에 자동 포함</li>
+          <li>중복 업로드 방지 (플랫폼별 1회)</li>
         </ul>
       </div>
 
@@ -309,8 +315,9 @@
           <li>한 번에 하나의 작업만 실행 가능합니다 (GPU/API 보호)</li>
           <li>실패한 스텝부터 재시도할 수 있으며, 이전 스텝의 결과는 캐시됩니다</li>
           <li>이전 스텝부터 재시도하면 이후 스텝은 자동으로 새로 생성됩니다</li>
+          <li>특정 장면만 재생성 가능 (이미지+클립 또는 클립만)</li>
           <li>STEP 4 진행 중 리소스 모니터로 GPU 활용 상태를 확인할 수 있습니다</li>
-          <li>설정 페이지에서 API 키 연결 상태를 확인하세요</li>
+          <li>도메인: musiqcut.com (Cloudflare Tunnel + Access 인증)</li>
         </ul>
       </div>
     </div>
@@ -578,12 +585,12 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=1774587000"></script>
-<script src="/js/dashboard.js?v=1774587000"></script>
-<script src="/js/pipeline.js?v=1774587000"></script>
-<script src="/js/feedback.js?v=1774587000"></script>
-<script src="/js/channel.js?v=1774587000"></script>
-<script src="/js/settings.js?v=1774587000"></script>
+<script src="/js/app.js?v=1774650000"></script>
+<script src="/js/dashboard.js?v=1774650000"></script>
+<script src="/js/pipeline.js?v=1774650000"></script>
+<script src="/js/feedback.js?v=1774650000"></script>
+<script src="/js/channel.js?v=1774650000"></script>
+<script src="/js/settings.js?v=1774650000"></script>
 
 </body>
 </html>

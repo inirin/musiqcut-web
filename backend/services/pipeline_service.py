@@ -694,8 +694,7 @@ async def _run_pipeline_steps(
                 return _vocal_map.get(sc.scene_no, False)
 
             s2v_indices = [i for i, s in enumerate(scenes)
-                           if getattr(s, 'shot_type', '') in ('closeup', 'medium')
-                           and _has_vocals(s)
+                           if _has_vocals(s)
                            and getattr(s, 'is_vocalist', False)]
             has_s2v = use_s2v and len(s2v_indices) > 0
 
