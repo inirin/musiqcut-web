@@ -132,6 +132,53 @@ async def _get_completed_steps(project_id: str) -> dict:
         return {r["step_no"]: json.loads(r["output_data"] or "{}") for r in rows}
 
 
+def _read_lyrics(project_id: str) -> dict:
+    """lyrics.json 읽기."""
+    lp = lyrics_path(project_id)
+    if not lp.exists():
+        return {}
+    return json.loads(lp.read_text(encoding="utf-8"))
+
+
+def _write_lyrics(project_id: str, data: dict):
+    """lyrics.json 쓰기."""
+    lp = lyrics_path(project_id)
+    lp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _build_clip_slot(project_id: str, scene, status: str = "pending",
+                     has_clip: bool = False, _has_vocals_fn=None) -> dict:
+    """클립 슬롯 dict 생성 (Step 4 init/progress/final 공용)."""
+    sno = scene.scene_no
+    slot = {
+        "status": status,
+        "image_url": f"/storage/projects/{project_id}/images/scene_{sno:02d}.png",
+        "start_sec": getattr(scene, 'start_sec', 0),
+        "end_sec": getattr(scene, 'end_sec', 0),
+        "duration": getattr(scene, 'duration', 0),
+        "vocal_lines": getattr(scene, 'vocal_lines', []),
+        "description": getattr(scene, 'description', ''),
+        "image_prompt": getattr(scene, 'image_prompt', ''),
+        "shot_type": getattr(scene, 'shot_type', 'medium'),
+        "_has_vocal": _has_vocals_fn(scene) if _has_vocals_fn else False,
+        "is_vocalist": getattr(scene, "is_vocalist", False),
+    }
+    if has_clip:
+        slot["url"] = f"/storage/projects/{project_id}/clips/clip_{sno:02d}.mp4"
+    return slot
+
+
+def _story_emit_data(story_data: dict, mood: str) -> dict:
+    """Step 1 완료 시 emitter에 전달할 데이터."""
+    return {
+        "title": story_data["title"], "lyrics": story_data["lyrics"],
+        "art_style": story_data.get("art_style", ""),
+        "vocal_style": story_data.get("vocal_style", ""),
+        "characters": story_data.get("characters", []),
+        "mood": mood,
+    }
+
+
 async def _merge_audio_to_clip(clip_path: str, audio_path: str,
                                start_sec: float, duration: float):
     """클립 영상에 오디오 구간을 합성 (in-place)."""
@@ -206,7 +253,7 @@ async def _clean_step_files(project_id: str, from_step: int, reset: bool = False
         if lp.exists():
             try:
                 import json
-                data = json.loads(lp.read_text(encoding="utf-8"))
+                data = _read_lyrics(project_id)
                 changed = False
                 keys_to_del = ["scenes"]
                 if from_step <= 2:
@@ -216,8 +263,7 @@ async def _clean_step_files(project_id: str, from_step: int, reset: bool = False
                         del data[key]
                         changed = True
                 if changed:
-                    lp.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                                  encoding="utf-8")
+                    _write_lyrics(project_id, data)
             except Exception:
                 pass
     if from_step <= 3:
@@ -323,32 +369,21 @@ async def _run_pipeline_steps(
         current_step = 1
         lp = lyrics_path(project_id)
         if 1 in completed and lp.exists():
-            story_data = json.loads(lp.read_text(encoding="utf-8"))
+            story_data = _read_lyrics(project_id)
             await emitter.update(1, "done",
                 f"스토리 완성: '{story_data['title']}'",
-                {"title": story_data["title"], "lyrics": story_data["lyrics"],
-                 "art_style": story_data.get("art_style", ""),
-                 "vocal_style": story_data.get("vocal_style", ""),
-                 "characters": story_data.get("characters", []),
-                 "mood": mood})
+                _story_emit_data(story_data, mood))
         else:
             await emitter.update(1, "running", "Gemini가 스토리와 작곡 지시를 구성하는 중...")
             await _log_step(project_id, 1, "스토리 생성", "running")
             story_data = await generate_story(theme, mood, length=length)
-            lp.write_text(
-                json.dumps(story_data, ensure_ascii=False, indent=2),
-                encoding="utf-8"
-            )
+            _write_lyrics(project_id, story_data)
             await _update_project(project_id, title=story_data["title"])
             await _log_step(project_id, 1, "스토리 생성", "done",
                             {"title": story_data["title"]})
             await emitter.update(1, "done",
                 f"스토리 완성: '{story_data['title']}'",
-                {"title": story_data["title"], "lyrics": story_data["lyrics"],
-                 "art_style": story_data.get("art_style", ""),
-                 "vocal_style": story_data.get("vocal_style", ""),
-                 "characters": story_data.get("characters", []),
-                 "mood": mood})
+                _story_emit_data(story_data, mood))
 
         title = story_data["title"]
         lyrics = story_data["lyrics"]
@@ -383,7 +418,7 @@ async def _run_pipeline_steps(
         # ── 가사 타임스탬프 추출 (Whisper) — 캐시 있으면 스킵 ──
         demucs_dir = str(Path(lyrics_path(project_id)).parent / "demucs")
         timed_lines = None
-        _cached_lyrics = json.loads(lp.read_text(encoding="utf-8")).get("whisper_lyrics")
+        _cached_lyrics = _read_lyrics(project_id).get("whisper_lyrics")
         if _cached_lyrics and len(_cached_lyrics) > 0 and resume_from >= 3:
             # 이미 분석된 결과 재사용 (구 문자열 형식 + 신 dict 형식 모두 지원)
             print("[LyricsSync] 캐시된 가사 사용 (Whisper 스킵)", file=sys.stderr)
@@ -500,10 +535,9 @@ async def _run_pipeline_steps(
                              "end": sg["end"], "has_vocal": sg.get("has_vocal", False),
                              "words": sg.get("words", [])}
                             for sg in timed_lines]
-            script_data_tmp = json.loads(lp.read_text(encoding="utf-8"))
+            script_data_tmp = _read_lyrics(project_id)
             script_data_tmp["whisper_lyrics"] = early_lyrics
-            lp.write_text(json.dumps(script_data_tmp, ensure_ascii=False, indent=2),
-                          encoding="utf-8")
+            _write_lyrics(project_id, script_data_tmp)
 
         # STEP 2 완료 (음악 생성 + 가사 분석 모두 끝남) — DB + 소켓 동시
         await _log_step(project_id, 2, "음악 생성", "done",
@@ -516,7 +550,7 @@ async def _run_pipeline_steps(
         # ── STEP 3: 장면 구성 + 이미지 생성 ──────────────────────
         current_step = 3
         # lyrics.json에 scenes가 있으면 장면 구성 캐시 사용
-        script_data = json.loads(lp.read_text(encoding="utf-8"))
+        script_data = _read_lyrics(project_id)
         cached_scenes = script_data.get("scenes", [])
         imgs_dir = image_path(project_id, 1).parent
         img_count = _count_files(imgs_dir, "scene_*.png")
@@ -614,10 +648,7 @@ async def _run_pipeline_steps(
                     sd['_has_vocal'] = timed_lines[i].get("has_vocal", False)
                 scenes_data.append(sd)
             script_data["scenes"] = scenes_data
-            lp.write_text(
-                json.dumps(script_data, ensure_ascii=False, indent=2),
-                encoding="utf-8"
-            )
+            _write_lyrics(project_id, script_data)
 
             # 3-2: 이미지 생성 (Imagen 4 API)
             await emitter.update(3, "running",
@@ -671,7 +702,7 @@ async def _run_pipeline_steps(
             # lyrics.json에서 _has_vocal 로드 (STEP 2에서 Whisper 분석한 결과 재사용)
             _vocal_map = {}
             try:
-                _scenes_data = json.loads(lp.read_text(encoding="utf-8")).get("scenes", [])
+                _scenes_data = _read_lyrics(project_id).get("scenes", [])
                 for sd in _scenes_data:
                     if "_has_vocal" in sd:
                         _vocal_map[sd.get("scene_no", 0)] = sd["_has_vocal"]
@@ -720,30 +751,10 @@ async def _run_pipeline_steps(
             init_slots = []
             first_idx = wan_indices[0] if wan_indices else (s2v_indices[0] if s2v_indices else 0)
             for i, sc in enumerate(scenes):
-                sno = sc.scene_no
-                # 기존 클립이 있으면 done 표시
-                if clip_files[i]:
-                    _init_status = "done"
-                elif i == first_idx:
-                    _init_status = "running"
-                else:
-                    _init_status = "pending"
-                _init_slot = {
-                    "status": _init_status,
-                    "image_url": f"/storage/projects/{project_id}/images/scene_{sno:02d}.png",
-                    "start_sec": getattr(sc, 'start_sec', 0),
-                    "end_sec": getattr(sc, 'end_sec', 0),
-                    "duration": getattr(sc, 'duration', 0),
-                    "vocal_lines": getattr(sc, 'vocal_lines', []),
-                    "description": getattr(sc, 'description', ''),
-                    "image_prompt": getattr(sc, 'image_prompt', ''),
-                    "shot_type": getattr(sc, 'shot_type', 'medium'),
-                    "_has_vocal": _has_vocals(sc),
-                    "is_vocalist": getattr(sc, "is_vocalist", False),
-                }
-                if clip_files[i]:
-                    _init_slot["url"] = f"/storage/projects/{project_id}/clips/clip_{sno:02d}.mp4"
-                init_slots.append(_init_slot)
+                status = "done" if clip_files[i] else ("running" if i == first_idx else "pending")
+                init_slots.append(_build_clip_slot(
+                    project_id, sc, status, has_clip=bool(clip_files[i]),
+                    _has_vocals_fn=_has_vocals))
             await emitter.update(4, "running",
                                  f"{engine_desc} 영상 클립 생성 중...",
                                  {"current": 0, "total": len(scenes),
@@ -760,26 +771,10 @@ async def _run_pipeline_steps(
                 # 전체 장면 슬롯: 완료된 건 clip URL, 미완료는 이미지 URL
                 clip_slots = []
                 for i, sc in enumerate(scenes):
-                    sno = sc.scene_no
-                    slot = {
-                        "image_url": f"/storage/projects/{project_id}/images/scene_{sno:02d}.png",
-                        "start_sec": getattr(sc, 'start_sec', 0),
-                        "end_sec": getattr(sc, 'end_sec', 0),
-                        "duration": getattr(sc, 'duration', 0),
-                        "vocal_lines": getattr(sc, 'vocal_lines', []),
-                        "description": getattr(sc, 'description', ''),
-                        "shot_type": getattr(sc, 'shot_type', 'medium'),
-                        "_has_vocal": _has_vocals(sc),
-                        "is_vocalist": getattr(sc, "is_vocalist", False),
-                    }
-                    if clip_files[i]:
-                        slot["status"] = "done"
-                        slot["url"] = f"/storage/projects/{project_id}/clips/clip_{sno:02d}.mp4"
-                    elif i == _current_clip_idx:
-                        slot["status"] = "running"
-                    else:
-                        slot["status"] = "pending"
-                    clip_slots.append(slot)
+                    status = "done" if clip_files[i] else ("running" if i == _current_clip_idx else "pending")
+                    clip_slots.append(_build_clip_slot(
+                        project_id, sc, status, has_clip=bool(clip_files[i]),
+                        _has_vocals_fn=_has_vocals))
                 # 생성 중인 클립 포함한 진행 수
                 display_count = done_count + (1 if _current_clip_idx >= 0 else 0)
                 data = {"current": display_count, "total": len(scenes),
@@ -900,23 +895,8 @@ async def _run_pipeline_steps(
 
             # 최종 clip_slots (뱃지 표시용)
             _current_clip_idx = -1
-            final_slots = []
-            for i, sc in enumerate(scenes):
-                sno = sc.scene_no
-                final_slots.append({
-                    "status": "done",
-                    "url": f"/storage/projects/{project_id}/clips/clip_{sno:02d}.mp4",
-                    "image_url": f"/storage/projects/{project_id}/images/scene_{sno:02d}.png",
-                    "start_sec": getattr(sc, 'start_sec', 0),
-                    "end_sec": getattr(sc, 'end_sec', 0),
-                    "duration": getattr(sc, 'duration', 0),
-                    "vocal_lines": getattr(sc, 'vocal_lines', []),
-                    "description": getattr(sc, 'description', ''),
-                    "image_prompt": getattr(sc, 'image_prompt', ''),
-                    "shot_type": getattr(sc, 'shot_type', 'medium'),
-                    "_has_vocal": _has_vocals(sc),
-                    "is_vocalist": getattr(sc, "is_vocalist", False),
-                })
+            final_slots = [_build_clip_slot(project_id, sc, "done", has_clip=True,
+                                            _has_vocals_fn=_has_vocals) for sc in scenes]
             await _log_step(project_id, 4, "영상 클립 생성", "done",
                             {"clip_count": len(clip_files), "clip_slots": final_slots})
             await emitter.update(4, "done",
@@ -939,7 +919,7 @@ async def _run_pipeline_steps(
         # whisper_lyrics 로드 (정밀 타이밍 자막용)
         _whisper_lyrics = None
         try:
-            _ldata = json.loads(lp.read_text(encoding="utf-8"))
+            _ldata = _read_lyrics(project_id)
             _whisper_lyrics = _ldata.get("whisper_lyrics")
         except Exception:
             pass
