@@ -328,7 +328,7 @@ textarea { resize: vertical; min-height: 80px; }
 .clip-wait-text { color: rgba(255,255,255,0.6); font-size: 0.75rem; }
 /* 모델 뱃지 */
 .clip-badge {
-  position: absolute; top: 4px; right: 4px;
+  position: absolute; top: 4px; right: 4px; z-index: 2;
   font-size: 0.6rem; padding: 1px 5px; border-radius: 3px;
   color: #fff; pointer-events: none; line-height: 1.4;
 }

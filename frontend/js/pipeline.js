@@ -641,14 +641,24 @@ async function _renderPreviews(containerId, type, urls) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  // URL 목록이 동일하면 재렌더 안 함 (폴링 깜빡임 방지)
-  const key = urls.join('|');
-  if (container._prevKey === key) return;
-  container._prevKey = key;
-
   container._lbType = type;
   container._lbUrls = urls;
   container._lbMeta = null;  // lyrics.json 폴백 사용
+
+  // 이미지 타입은 보컬 뱃지를 위해 lyrics.json 먼저 로드
+  let sceneMeta = null;
+  if (type === 'image' && window._currentProjectId) {
+    try {
+      const ld = await fetch(`/storage/projects/${window._currentProjectId}/lyrics.json?t=${Date.now()}`).then(r => r.json());
+      sceneMeta = ld.scenes || null;
+    } catch {}
+  }
+
+  // URL + 뱃지 상태가 동일하면 재렌더 안 함 (폴링 깜빡임 방지)
+  const badgeKey = sceneMeta ? sceneMeta.map(s => isLipSync(s) ? '1' : '0').join('') : '';
+  const key = urls.join('|') + badgeKey;
+  if (container._prevKey === key) return;
+  container._prevKey = key;
 
   const bust = `?t=${Date.now()}`;
   if (type === 'video') {
@@ -657,14 +667,6 @@ async function _renderPreviews(containerId, type, urls) {
       return `<video src="${url}${bust}" muted poster="${poster}${bust}" preload="metadata" data-lb-idx="${i}" onerror="this.style.opacity=0.3"></video>`;
     }).join('');
   } else {
-    // 보컬 장면 판별을 위해 lyrics.json 로드
-    let sceneMeta = null;
-    if (window._currentProjectId) {
-      try {
-        const ld = await fetch(`/storage/projects/${window._currentProjectId}/lyrics.json`).then(r => r.json());
-        sceneMeta = ld.scenes || null;
-      } catch {}
-    }
     container.innerHTML = urls.map((url, i) => {
       let badge = '';
       if (sceneMeta && sceneMeta[i] && isLipSync(sceneMeta[i])) {
