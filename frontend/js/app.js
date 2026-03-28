@@ -2,6 +2,34 @@
 
 const NON_VOCAL = new Set(['(intro)', '(outro)', '(interlude)', '(instrumental)', '']);
 
+// ── 스케줄 시간 포맷 (대시보드 + 설정 공용) ──────────
+const _pad2 = n => String(n).padStart(2, '0');
+function schedFmtAbs(t) {
+  if (!t) return '';
+  const d = new Date(t + 'Z');
+  return `${d.getFullYear()}-${_pad2(d.getMonth()+1)}-${_pad2(d.getDate())} ${_pad2(d.getHours())}:${_pad2(d.getMinutes())}:${_pad2(d.getSeconds())}`;
+}
+function schedFmtRel(t) {
+  if (!t) return '';
+  const diff = Math.floor((Date.now() - new Date(t + 'Z')) / 60000);
+  if (diff < 1) return '방금 전';
+  if (diff < 60) return `${diff}분 전`;
+  if (diff < 1440) return `${Math.floor(diff/60)}시간 전`;
+  return schedFmtAbs(t);
+}
+function schedFmtFuture(ms) {
+  if (ms <= 0) return '곧 시작';
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m}분 후`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
+}
+function schedNextMs(sched) {
+  if (!sched.last_created_at) return 0;
+  return new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
+}
+
 /**
  * STEP 2 Whisper 추출 가사를 step-2-prompt 요소에 렌더링
  * @param {string} projectId

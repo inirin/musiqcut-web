@@ -185,28 +185,6 @@ async function toggleSchedule(type, enabled) {
 
 function renderGenStatus(sched) {
   if (!sched.enabled) return '';
-  const pad = n => String(n).padStart(2,'0');
-  const fmtAbs = t => {
-    if (!t) return '';
-    const d = new Date(t + 'Z');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
-  const fmtRel = t => {
-    if (!t) return '';
-    const diff = Math.floor((Date.now() - new Date(t + 'Z')) / 60000);
-    if (diff < 1) return '방금 전';
-    if (diff < 60) return `${diff}분 전`;
-    if (diff < 1440) return `${Math.floor(diff/60)}시간 전`;
-    return fmtAbs(t);
-  };
-  const fmtFuture = ms => {
-    if (ms <= 0) return '곧 시작';
-    const m = Math.floor(ms / 60000);
-    if (m < 60) return `${m}분 후`;
-    const h = Math.floor(m / 60);
-    const rm = m % 60;
-    return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
-  };
 
   let html = '';
 
@@ -215,25 +193,23 @@ function renderGenStatus(sched) {
   if (sched.running_project) {
     let nextInfo = '';
     if (sched.last_created_at) {
-      const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
-      if (nextMs <= Date.now()) {
-        nextInfo = ' · 다음 생성 : 완성 후 즉시';
-      } else {
-        nextInfo = ` · 다음 생성 : ${fmtFuture(nextMs - Date.now())}`;
-      }
+      const nMs = schedNextMs(sched);
+      nextInfo = nMs <= Date.now()
+        ? ' · 다음 생성 : 완성 후 즉시'
+        : ` · 다음 생성 : ${schedFmtFuture(nMs - Date.now())}`;
     }
     html += `<span class="gen-dot running"></span>
       <span class="gen-primary-text">생성 중 : ${sched.running_project.title}<span class="gen-abs-time">${nextInfo}</span></span>`;
   } else if (sched.last_created_at) {
-    const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
-    const remaining = nextMs - Date.now();
+    const nMs = schedNextMs(sched);
+    const remaining = nMs - Date.now();
     if (remaining <= 0) {
       html += `<span class="gen-dot pending"></span>
         <span class="gen-primary-text">다음 생성 : 곧 시작</span>`;
     } else {
-      const nextAbs = fmtAbs(new Date(nextMs).toISOString().replace('Z',''));
+      const nextAbs = schedFmtAbs(new Date(nMs).toISOString().replace('Z',''));
       html += `<span class="gen-dot pending"></span>
-        <span class="gen-primary-text">다음 생성 : ${fmtFuture(remaining)} <span class="gen-abs-time">(${nextAbs})</span></span>`;
+        <span class="gen-primary-text">다음 생성 : ${schedFmtFuture(remaining)} <span class="gen-abs-time">(${nextAbs})</span></span>`;
     }
   } else {
     html += `<span class="gen-dot pending"></span>
@@ -248,23 +224,23 @@ function renderGenStatus(sched) {
     if (sched.last_created_at) {
       html += `<div class="gen-hist-item">
         <div class="gen-hist-label">마지막 생성</div>
-        <div class="gen-hist-time">${fmtRel(sched.last_created_at)}</div>
-        <div class="gen-hist-abs">${fmtAbs(sched.last_created_at)}</div>
+        <div class="gen-hist-time">${schedFmtRel(sched.last_created_at)}</div>
+        <div class="gen-hist-abs">${schedFmtAbs(sched.last_created_at)}</div>
       </div>`;
     }
     if (sched.last_success_at) {
       html += `<div class="gen-hist-item">
         <div class="gen-hist-label">마지막 완성</div>
-        <div class="gen-hist-time">${fmtRel(sched.last_success_at)}</div>
-        <div class="gen-hist-abs">${fmtAbs(sched.last_success_at)}</div>
+        <div class="gen-hist-time">${schedFmtRel(sched.last_success_at)}</div>
+        <div class="gen-hist-abs">${schedFmtAbs(sched.last_success_at)}</div>
       </div>`;
     }
     if (sched.last_failure_at) {
       const reason = sched.last_failure_reason || '';
       html += `<div class="gen-hist-item failure">
         <div class="gen-hist-label">마지막 실패</div>
-        <div class="gen-hist-time">${fmtRel(sched.last_failure_at)}</div>
-        <div class="gen-hist-abs">${fmtAbs(sched.last_failure_at)}</div>
+        <div class="gen-hist-time">${schedFmtRel(sched.last_failure_at)}</div>
+        <div class="gen-hist-abs">${schedFmtAbs(sched.last_failure_at)}</div>
         ${reason ? `<div class="gen-reason">사유 : ${reason}</div>` : ''}
       </div>`;
     }

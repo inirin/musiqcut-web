@@ -351,7 +351,8 @@ async def _generation_loop():
                     if remaining > 0:
                         print(f"[Scheduler] 최근 생성 {elapsed/60:.0f}분 전 → {remaining/60:.0f}분 후 생성",
                               file=sys.stderr)
-                        await asyncio.sleep(remaining)
+                        # 최대 60초씩 쪼개서 sleep (중간에 상태 변경 감지)
+                        await asyncio.sleep(min(remaining, 60))
                         continue
                 except Exception:
                     pass

@@ -2,24 +2,13 @@
 pages['dashboard'] = loadDashboard;
 
 function _dashScheduleText(sched) {
-  const fmtFuture = ms => {
-    if (ms <= 0) return '곧 시작';
-    const m = Math.floor(ms / 60000);
-    if (m < 60) return `${m}분 후`;
-    const h = Math.floor(m / 60);
-    const rm = m % 60;
-    return rm > 0 ? `${h}시간 ${rm}분 후` : `${h}시간 후`;
-  };
   if (sched.running_project) {
-    const pid = sched.running_project.id;
-    const title = sched.running_project.title;
     return `<span class="gen-dot running"></span>
-      <span class="gen-primary-text" style="flex:1">자동 생성 중 : ${title}</span>
+      <span class="gen-primary-text" style="flex:1">자동 생성 중 : ${sched.running_project.title}</span>
       <span style="opacity:0.5">›</span>`;
   } else if (sched.last_created_at) {
-    const nextMs = new Date(sched.last_created_at + 'Z').getTime() + (sched.interval_hours || 2) * 3600000;
-    const remaining = nextMs - Date.now();
-    const text = remaining <= 0 ? '자동 생성 예정 : 곧 시작' : `자동 생성 예정 : ${fmtFuture(remaining)}`;
+    const remaining = schedNextMs(sched) - Date.now();
+    const text = remaining <= 0 ? '자동 생성 예정 : 곧 시작' : `자동 생성 예정 : ${schedFmtFuture(remaining)}`;
     return `<span class="gen-dot pending"></span>
       <span class="gen-primary-text" style="flex:1">${text}</span>
       <span style="opacity:0.5">›</span>`;
