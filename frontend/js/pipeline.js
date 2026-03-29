@@ -762,17 +762,18 @@ async function _showLightboxItemInner() {
   if (audioEl) { audioEl.pause(); audioEl.removeAttribute('src'); }
   if (infoEl) { infoEl.classList.add('hidden'); lyricsEl.innerHTML = ''; }
 
-  const bust = url.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
+  const cleanUrl = url.split('?')[0];
+  const bust = `?t=${Date.now()}`;
   const curMeta = _lbMeta ? _lbMeta[_lbIndex] : null;
-  const isImage = _lbType === 'image' || (!url.endsWith('.mp4') && !curMeta?.status);
-  const clipStatus = isImage ? 'done' : (curMeta?.status || (url.endsWith('.mp4') ? 'done' : 'pending'));
+  const isImage = _lbType === 'image' || (!cleanUrl.endsWith('.mp4') && !curMeta?.status);
+  const clipStatus = isImage ? 'done' : (curMeta?.status || (cleanUrl.endsWith('.mp4') ? 'done' : 'pending'));
   const overlay = document.getElementById('lightbox-status-overlay');
 
-  if (clipStatus === 'done' && url.endsWith('.mp4')) {
+  if (clipStatus === 'done' && cleanUrl.endsWith('.mp4')) {
     // 완성된 영상 클립 — 오디오는 별도 audio element로 싱크 재생
     img.classList.add('hidden');
     vid.classList.remove('hidden');
-    vid.src = url + bust;
+    vid.src = cleanUrl + bust;
     vid.muted = true;
     if (overlay) overlay.classList.add('hidden');
   } else if (isImage) {
@@ -780,13 +781,13 @@ async function _showLightboxItemInner() {
     vid.classList.add('hidden');
     vid.pause(); vid.src = '';
     img.classList.remove('hidden');
-    img.src = url + bust;
+    img.src = cleanUrl + bust;
     if (overlay) overlay.classList.add('hidden');
   } else {
     vid.classList.add('hidden');
     vid.pause(); vid.src = '';
     img.classList.remove('hidden');
-    img.src = (curMeta?.image_url || url) + bust;
+    img.src = ((curMeta?.image_url || cleanUrl).split('?')[0]) + bust;
     // 상태 오버레이
     if (overlay) {
       overlay.classList.remove('hidden');
