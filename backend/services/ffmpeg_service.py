@@ -422,7 +422,7 @@ async def render_video(
             theme_display = theme
 
         # 1) 줄 수 결정 — 폰트 40px 이상 될 때까지 줄 수 늘림
-        MIN_THEME_FS = 40
+        MIN_THEME_FS = 48
         words = theme_display.split()
         theme_lines = [theme_display]
 
