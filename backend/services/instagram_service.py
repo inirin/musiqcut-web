@@ -128,9 +128,17 @@ async def upload_reels(
     caption: str,
 ) -> dict:
     """Instagram Reels 업로드 (video_url 방식)."""
-    # 임시 공개 URL 생성 (Cloudflare Access Bypass 경로, 10분 유효)
-    from backend.routers.upload import create_temp_video_url
-    video_url = create_temp_video_url(video_path)
+    # 임시 공개 URL 생성 — 웹서버 프로세스의 토큰 딕셔너리에 등록
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient() as _c:
+            _r = await _c.post("http://localhost:8000/api/upload/create-temp-url",
+                              json={"video_path": video_path})
+            video_url = _r.json()["url"]
+    except Exception:
+        # 웹서버 내부에서 호출된 경우 직접 생성
+        from backend.routers.upload import create_temp_video_url
+        video_url = create_temp_video_url(video_path)
 
     async with httpx.AsyncClient(timeout=300) as client:
         # 1) 미디어 컨테이너 생성 (video_url 방식)
@@ -139,7 +147,6 @@ async def upload_reels(
             "video_url": video_url,
             "caption": caption,
             "share_to_feed": "true",
-            "is_made_with_ai": "true",
             "access_token": access_token,
         })
         if resp.status_code != 200:
@@ -162,7 +169,8 @@ async def upload_reels(
             if code == "FINISHED":
                 break
             elif code == "ERROR":
-                raise RuntimeError(f"Instagram 처리 실패: {status.get('status')}")
+                print(f"[Instagram] 처리 에러 상세: {status}", file=sys.stderr)
+                raise RuntimeError(f"Instagram 처리 실패: {status}")
         else:
             raise RuntimeError("Instagram 처리 시간 초과")
 

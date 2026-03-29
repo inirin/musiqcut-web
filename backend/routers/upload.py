@@ -24,13 +24,16 @@ _temp_video_tokens: dict[str, tuple[str, float]] = {}  # token → (file_path, e
 async def serve_public_video(token: str):
     """임시 토큰으로 비디오 파일 서빙 (Cloudflare Access Bypass 경로)."""
     import time
+    from fastapi.responses import JSONResponse
     entry = _temp_video_tokens.get(token)
     if not entry:
-        return {"error": "Invalid or expired token"}, 404
+        return JSONResponse({"error": "Invalid or expired token"}, status_code=404)
     file_path, expires_ts = entry
     if time.time() > expires_ts:
         _temp_video_tokens.pop(token, None)
-        return {"error": "Token expired"}, 410
+        return JSONResponse({"error": "Token expired"}, status_code=410)
+    if not Path(file_path).exists():
+        return JSONResponse({"error": "File not found"}, status_code=404)
     return FileResponse(file_path, media_type="video/mp4")
 
 
@@ -40,6 +43,16 @@ def create_temp_video_url(video_path: str, ttl_sec: int = 600) -> str:
     token = secrets.token_urlsafe(32)
     _temp_video_tokens[token] = (video_path, time.time() + ttl_sec)
     return f"https://musiqcut.com/api/upload/public-video/{token}"
+
+
+@router.post("/create-temp-url")
+async def create_temp_url_endpoint(body: dict):
+    """외부 프로세스에서 임시 공개 URL 생성 요청 (웹서버 메모리에 토큰 등록)."""
+    video_path = body.get("video_path", "")
+    if not video_path or not Path(video_path).exists():
+        return {"error": "Invalid video path"}
+    url = create_temp_video_url(video_path)
+    return {"url": url}
 
 
 # ── OAuth ────────────────────────────────────────
