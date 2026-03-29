@@ -109,7 +109,24 @@ async function _uploadToPlatform(projectId, platform) {
     const data = await res.json();
     if (data.ok) {
       showToast(`${label} 업로드를 시작합니다`, 'success');
-      setTimeout(() => { _uploadingPlatforms.delete(platform); _loadUploadButtons(projectId); }, 3000);
+      // 완료될 때까지 폴링
+      const pollUpload = setInterval(async () => {
+        try {
+          const st = await fetch(`/api/upload/${projectId}/status`).then(r => r.json());
+          const u = (st.uploads || []).find(u => u.platform === platform);
+          if (u && u.status === 'done') {
+            clearInterval(pollUpload);
+            _uploadingPlatforms.delete(platform);
+            _loadUploadButtons(projectId);
+            showToast(`${label} 업로드 완료!`, 'success');
+          } else if (u && u.status === 'failed') {
+            clearInterval(pollUpload);
+            _uploadingPlatforms.delete(platform);
+            _loadUploadButtons(projectId);
+            showToast(`${label} 업로드 실패`, 'error');
+          }
+        } catch {}
+      }, 3000);
     } else {
       showToast(data.error || '업로드 실패', 'error');
       _uploadingPlatforms.delete(platform);
