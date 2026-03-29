@@ -13,6 +13,8 @@ from backend.database import DB_PATH
 IG_AUTH_URL = "https://api.instagram.com/oauth/authorize"
 IG_TOKEN_URL = "https://api.instagram.com/oauth/access_token"
 GRAPH_API = "https://graph.instagram.com"
+# 콘텐츠 퍼블리싱은 graph.facebook.com 사용
+PUBLISH_API = "https://graph.facebook.com/v22.0"
 
 SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages"
 
@@ -82,13 +84,11 @@ async def get_ig_account(access_token: str, user_id: str = "") -> dict:
 
 
 async def refresh_access_token(access_token: str) -> dict:
-    """장기 토큰 갱신 (만료 전 갱신 가능)."""
+    """장기 토큰 갱신 (만료 전 갱신 가능, Instagram Direct Login)."""
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{GRAPH_API}/oauth/access_token", params={
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.instagram_app_id,
-            "client_secret": settings.instagram_app_secret,
-            "fb_exchange_token": access_token,
+        resp = await client.get(f"{GRAPH_API}/refresh_access_token", params={
+            "grant_type": "ig_refresh_token",
+            "access_token": access_token,
         })
         resp.raise_for_status()
         data = resp.json()
@@ -135,11 +135,12 @@ async def upload_reels(
 
     async with httpx.AsyncClient(timeout=300) as client:
         # 1) Resumable 컨테이너 생성
-        resp = await client.post(f"{GRAPH_API}/{ig_user_id}/media", data={
+        resp = await client.post(f"{PUBLISH_API}/{ig_user_id}/media", data={
             "media_type": "REELS",
             "upload_type": "resumable",
             "caption": caption,
             "share_to_feed": "true",
+            "is_made_with_ai": "true",
             "access_token": access_token,
         })
         resp.raise_for_status()
@@ -165,7 +166,7 @@ async def upload_reels(
         # 3) 처리 상태 폴링
         for _ in range(60):  # 최대 5분
             await asyncio.sleep(5)
-            status_resp = await client.get(f"{GRAPH_API}/{creation_id}", params={
+            status_resp = await client.get(f"{PUBLISH_API}/{creation_id}", params={
                 "fields": "status_code,status",
                 "access_token": access_token,
             })
@@ -180,7 +181,7 @@ async def upload_reels(
             raise RuntimeError("Instagram 처리 시간 초과")
 
         # 4) 퍼블리시
-        pub_resp = await client.post(f"{GRAPH_API}/{ig_user_id}/media_publish", data={
+        pub_resp = await client.post(f"{PUBLISH_API}/{ig_user_id}/media_publish", data={
             "creation_id": creation_id,
             "access_token": access_token,
         })
