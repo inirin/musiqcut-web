@@ -123,7 +123,8 @@ async def upload_video(
     """TikTok 동영상 업로드 (Direct Post, chunked upload)."""
     file_path = Path(video_path)
     file_size = file_path.stat().st_size
-    total_chunks = max(1, math.ceil(file_size / CHUNK_SIZE))
+    chunk_size = min(CHUNK_SIZE, file_size)
+    total_chunks = max(1, math.ceil(file_size / chunk_size))
 
     async with httpx.AsyncClient(timeout=300) as client:
         # 1) 업로드 초기화
@@ -140,7 +141,7 @@ async def upload_video(
                 "source_info": {
                     "source": "FILE_UPLOAD",
                     "video_size": file_size,
-                    "chunk_size": CHUNK_SIZE,
+                    "chunk_size": chunk_size,
                     "total_chunk_count": total_chunks,
                 },
             },
@@ -163,8 +164,8 @@ async def upload_video(
         # 2) 청크 업로드
         with open(file_path, "rb") as f:
             for chunk_idx in range(total_chunks):
-                chunk_data = f.read(CHUNK_SIZE)
-                start = chunk_idx * CHUNK_SIZE
+                chunk_data = f.read(chunk_size)
+                start = chunk_idx * chunk_size
                 end = start + len(chunk_data) - 1
 
                 chunk_resp = await client.put(
