@@ -302,7 +302,9 @@ function isNotificationEnabled() {
 }
 
 function testNotification() {
-  if (!('Notification' in window)) { toast('이 브라우저는 알림을 지원하지 않습니다', 'error'); return; }
+  if (!('Notification' in window) || /Mobi|Android/i.test(navigator.userAgent)) {
+    toast('모바일 푸시 알림은 추후 지원 예정입니다', 'info'); return;
+  }
   if (Notification.permission !== 'granted') {
     Notification.requestPermission().then(p => {
       if (p === 'granted') {
