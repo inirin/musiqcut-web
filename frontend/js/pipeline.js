@@ -364,9 +364,11 @@ function handlePipelineEvent(evt) {
     }
     if (evt.status === 'running' && evt.step === 4) startResourceMonitor(evt.step);
     if (evt.status === 'done' && evt.step === 4) stopResourceMonitor();
-    // 클립 재생성 완료 알림 (재생성 대기 중이던 클립이 done이 됐을 때)
+    // 클립 재생성 완료 알림
     if (evt.step === 4 && d?.clip_slots && evt.message?.includes('재생성')) {
-      sendNotification('클립 재생성 완료', _pipelineTitle || '클립이 재생성되었습니다.');
+      const sceneMatch = evt.message.match(/장면\s*(\d+)/);
+      const sceneNo = sceneMatch ? sceneMatch[1] : '?';
+      sendNotification('클립 재생성 완료', `${_pipelineTitle || '작품'} — 장면 ${sceneNo}`);
     }
   }
 
