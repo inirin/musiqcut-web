@@ -227,6 +227,7 @@ async def toggle_platform_auto_upload(platform: str, enabled: bool = True):
 @router.get("/instagram/auth-url")
 async def instagram_auth_url():
     """Instagram OAuth 인증 URL 반환."""
+    from backend.config import settings
     if not settings.instagram_app_id:
         return {"ok": False, "error": "Instagram App ID가 설정되지 않았습니다"}
     return {"ok": True, "url": instagram_service.get_auth_url()}
@@ -305,6 +306,7 @@ async def disconnect_instagram():
 @router.get("/tiktok/auth-url")
 async def tiktok_auth_url():
     """TikTok OAuth 인증 URL 반환."""
+    from backend.config import settings
     if not settings.tiktok_client_key:
         return {"ok": False, "error": "TikTok Client Key가 설정되지 않았습니다"}
     return {"ok": True, "url": tiktok_service.get_auth_url()}
