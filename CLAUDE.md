@@ -37,7 +37,7 @@ venv/Scripts/python.exe auto_generate.py
 
 ### Pipeline Flow (5 Steps, Sequential)
 1. **Script Generation** — Gemini 2.5 Flash → 제목, 가사, 음악 프롬프트, 아트 스타일, 캐릭터, 해시태그 (`gemini_script_service.py`)
-2. **Music Generation** — Suno AI → MP3 + Demucs 보컬 분리 → faster-whisper 전사 + whisperx forced alignment(wav2vec2) 단어별 정밀 타이밍 → Gemini Flash 가사 보정 (누락 단어 복원 포함) (`suno_service.py`, `lyrics_sync_service.py`)
+2. **Music Generation** — Suno AI → MP3 → faster-whisper 전사(원본 mp3 직접, demucs 미사용) + whisperx forced alignment(wav2vec2) 단어별 정밀 타이밍 → Gemini Flash 가사 보정 (전체 단어 단위, SequenceMatcher 타이밍 보존) (`suno_service.py`, `lyrics_sync_service.py`)
 3. **Image Generation** — Imagen 4 via Gemini API → 장면별 576x1024 PNG (`gemini_image_service.py`)
 4. **Video Clip Generation** — 장면별 자동 분기:
    - 보컬+vocalist → **Wan 2.2 S2V** 립싱크 (`wan_s2v_service.py`)
@@ -58,16 +58,16 @@ venv/Scripts/python.exe auto_generate.py
 - **Database**: SQLite (`pipeline.db`) via aiosqlite, 스키마는 `database.py`에서 앱 시작 시 자동 생성
 - **Config**: pydantic-settings로 `.env` 로드 (`backend/config.py`)
 
-### Subtitle System (노래방 스타일)
-- 제목 자막: 어그로체(AggroB.ttf, 흰색) + 테마 자막(노란색 #FFF700), 자동 줄바꿈 (긴 제목 2~3줄 균등 분할)
-- 가사 자막: 카페24 단정해(Cafe24Danjunghae.ttf, 40px), ASS 포맷
-- 단어별로 한 줄씩 채우기 (최대 3단어/줄)
-- 한 줄 가득 차면 고정, 다른 줄에서 채우기 시작 (2줄 교대)
-- 무음 갭(3초 이상) + 최소 표시 시간(2초) 경과한 줄은 순차 제거
-- 다음 줄이 가득 차면 이전 줄 무조건 리셋 (보컬 연속 시)
+### Lyrics & Subtitle System
+- **Whisper 전사**: 원본 mp3 직접 사용 (demucs 미사용), condition_on_previous_text fallback (False→True)
+- **환각 방지 3중 방어**: ① 마지막 세그먼트 원문 겹침 0% 제거 ② SequenceMatcher 맨 끝 insert 차단 ③ 끝부분 0.3초 미만 연속 단어 트림
+- **Gemini 보정**: 전체 단어 단위 (줄 무관), SequenceMatcher 타이밍 보존, 보컬라이즈 보존, delete 시 원문에 없는 단어만 삭제 허용
+- **트리밍 → 보정 순서**: scene_count 맞추기 후 Gemini 보정 (잘린 가사 복원 방지)
+- **보컬 감지 기준**: 인식 단어 수 < 원문 30% 미만이면 실패 → Step 1 재시도
+- **자막 ASS**: 카페24 단정해(40px), 2줄 교대, 3단어/줄, 무음 갭 fade-out
+- **첫 프레임 가사 숨김**: 썸네일용 (제목만 표시)
 - whisperx forced alignment 실패 시 faster-whisper fallback
-- Gemini 보정 가사를 words 텍스트에도 동기화 (구두점 자동 제거)
-- Whisper 0.1초 미만 단어 필터링 (노이즈 오인식 방지)
+- 0.1초 미만 단어 필터링 (노이즈 오인식 방지)
 
 ### Frontend
 순수 HTML/JS/CSS (프레임워크 없음). `frontend/` 디렉토리를 FastAPI StaticFiles로 서빙.
