@@ -73,7 +73,7 @@ def generate_metadata(title: str, theme: str, project_id: str = None) -> dict:
 
     hashtag_line = " ".join(hashtags)
     # 인스타/틱톡용 캡션: 제목 + 테마설명 + 해시태그
-    caption = f"{title}\n{desc_part}\n\n{hashtag_line}"
+    caption = f"{title}\n{desc_part}\n \n{hashtag_line}"
     # YouTube tags (# 제거)
     tags = [h.lstrip("#") for h in hashtags]
     return {"title": upload_title, "title_flat": upload_title_flat, "caption": caption, "tags": tags}
