@@ -220,10 +220,9 @@ def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.3, story_text: 
                 break
             cut_idx = wi
         short_count = len(words) - cut_idx
-        if short_count > 0 and short_count <= 2 and lyrics_words:
-            # 짧은 단어 1~2개이고 원문에 있으면 정당한 추가 → 보존
-            if all(words[wi]["text"].lower() in lyrics_words for wi in range(cut_idx, len(words))):
-                cut_idx = len(words)  # 트림 취소
+        # 2개 이하면 보존 (정당한 1~2단어 추가), 3개 이상이면 환각으로 제거
+        if short_count <= 2:
+            cut_idx = len(words)
         if cut_idx < len(words):
             removed = words[cut_idx:]
             sg["words"] = words[:cut_idx]
