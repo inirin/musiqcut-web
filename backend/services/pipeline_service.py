@@ -258,17 +258,18 @@ def _apply_corrected_words(timed_lines: list, original_words: list, corrected_wo
                     "end": round(t_start + (k + 1) * step, 3),
                 })
         elif op == "insert":
-            # 맨 끝 삽입은 차단 (환각 방지), 중간 삽입만 허용
-            if i1 >= len(original_words):
-                print(f"[LyricsSync] 맨 끝 삽입 차단: {corrected_words[j1:j2]}",
-                      file=sys.stderr)
-                continue
-            # 중간 삽입 → 이전 단어와 다음 단어 사이 시간에 배분
+            # 삽입 → 이전/다음 단어 사이 시간에 배분
+            # (맨 끝 환각은 _trim_short_tail_words에서 타이밍 기반으로 제거)
             if new_words_flat:
                 t_start = new_words_flat[-1]["end"]
-            else:
+            elif i1 < len(original_words):
                 t_start = original_words[i1]["start"]
-            t_end = original_words[i1]["start"]
+            else:
+                t_start = original_words[-1]["end"] if original_words else 0.0
+            if i1 < len(original_words):
+                t_end = original_words[i1]["start"]
+            else:
+                t_end = t_start + 0.5
             if t_end <= t_start:
                 t_end = t_start + 0.3
             n = j2 - j1
