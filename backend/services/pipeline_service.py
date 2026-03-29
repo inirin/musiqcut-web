@@ -203,10 +203,11 @@ async def _merge_audio_to_clip(clip_path: str, audio_path: str,
         raise RuntimeError(result.stderr[-200:])
 
 
-def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.3):
+def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.3, story_text: str = ""):
     """마지막 보컬 세그먼트 끝에서 타이밍이 극히 짧은 단어 연속 제거.
-    Gemini 보정으로 삽입된 단어가 짧은 시간에 몰린 경우 오보정으로 판단."""
-    import sys
+    단, 원문 가사에 있는 단어는 보존 (정당한 추가). 원문에 없는 단어만 환각으로 제거."""
+    import sys, re
+    lyrics_words = set(re.sub(r'[.,!?;:~…\"\'\-\[\]]+', '', story_text).lower().split()) if story_text else set()
     for sg in reversed(timed_lines):
         words = sg.get("words", [])
         if not words:
@@ -218,6 +219,11 @@ def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.3):
             if dur >= min_dur:
                 break
             cut_idx = wi
+        short_count = len(words) - cut_idx
+        if short_count > 0 and short_count <= 2 and lyrics_words:
+            # 짧은 단어 1~2개이고 원문에 있으면 정당한 추가 → 보존
+            if all(words[wi]["text"].lower() in lyrics_words for wi in range(cut_idx, len(words))):
+                cut_idx = len(words)  # 트림 취소
         if cut_idx < len(words):
             removed = words[cut_idx:]
             sg["words"] = words[:cut_idx]
@@ -599,7 +605,7 @@ async def _run_pipeline_steps(
                     # SequenceMatcher로 원본↔보정 정렬, 타이밍 보존
                     _apply_corrected_words(timed_lines, original_words, corrected_words, story_text=lyrics)
                     # 끝부분 짧은 타이밍 단어 제거 (Gemini 오보정 후처리)
-                    _trim_short_tail_words(timed_lines)
+                    _trim_short_tail_words(timed_lines, story_text=lyrics)
                     # 세그먼트 text도 words에서 재구성
                     for sg in timed_lines:
                         words = sg.get("words", [])
