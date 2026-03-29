@@ -192,3 +192,5 @@ async def auto_upload_if_configured(project_id: str):
         if account:
             print(f"[Upload] {platform} 자동 업로드 실행", file=sys.stderr)
             await create_and_execute_upload(project_id, platform)
+            # 플랫폼 간 rate limit 방지
+            await asyncio.sleep(10)
