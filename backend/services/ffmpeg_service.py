@@ -349,8 +349,8 @@ async def render_video(
         def _est_w(t):
             return sum(0.9 if ord(c) > 127 else 0.5 for c in t)
 
-        # 제목 길이에 따라 폰트 크기 가변 (양쪽 여백 40px 확보)
-        max_w = TARGET_W - 80  # 656px 사용 가능 영역
+        # 제목 길이에 따라 폰트 크기 가변 (양쪽 여백 60px 확보 — 유튜브 썸네일 크롭 대비)
+        max_w = TARGET_W - 120  # 616px 사용 가능 영역
 
         # 줄 수 결정 — 폰트 48px 이상 될 때까지 줄 수 늘림
         MIN_TITLE_FS = 48
