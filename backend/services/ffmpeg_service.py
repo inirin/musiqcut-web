@@ -458,7 +458,7 @@ async def render_video(
 
         # 2) 최종 가장 긴 줄 기준 폰트 크기 (최대 80)
         longest_w = max(_est_w(l) for l in theme_lines)
-        theme_fs = min(80, max(32, int(max_w / max(longest_w, 1))))
+        theme_fs = min(80, max(36, int(max_w / max(longest_w, 1))))
         theme_bw = max(2, theme_fs // 16)
         theme_y = 180 + len(title_lines) * (title_fs + 6) + 10
         theme_common = (

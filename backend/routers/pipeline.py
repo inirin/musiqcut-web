@@ -104,6 +104,23 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
         except Exception as e:
             print(f"[Regen] DB 슬롯 업데이트 실패: {e}", file=__import__('sys').stderr)
 
+        # emitter에 클립 슬롯 변경 알림 (WebSocket 클라이언트 실시간 반영)
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                row2 = await (await db.execute(
+                    "SELECT output_data FROM pipeline_steps "
+                    "WHERE project_id=? AND step_no=4 ORDER BY id DESC LIMIT 1",
+                    (project_id,)
+                )).fetchone()
+                if row2 and row2[0]:
+                    import json as _json2
+                    step4_data = _json2.loads(row2[0])
+                    await existing_emitter.update(4, "running",
+                        f"클립 재생성 대기 중... (장면 {scene_no})",
+                        step4_data)
+        except Exception:
+            pass
+
         print(f"[Regen] 파이프라인 실행 중 — 파일만 삭제, 루프에서 자동 재생성 예정",
               file=__import__('sys').stderr)
         return {"ok": True, "project_id": project_id, "scene_no": scene_no,
