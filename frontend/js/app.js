@@ -301,6 +301,25 @@ function isNotificationEnabled() {
   return localStorage.getItem('notif_enabled') === 'true';
 }
 
+function testNotification() {
+  if (!('Notification' in window)) { toast('이 브라우저는 알림을 지원하지 않습니다', 'error'); return; }
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') {
+        localStorage.setItem('notif_enabled', 'true');
+        updateNotifStatus();
+        new Notification('알림 테스트', { body: '브라우저 알림이 정상 작동합니다.', icon: '/favicon.ico' });
+      } else {
+        toast('알림 권한이 거부되었습니다', 'error');
+      }
+    });
+    return;
+  }
+  localStorage.setItem('notif_enabled', 'true');
+  updateNotifStatus();
+  new Notification('알림 테스트', { body: '브라우저 알림이 정상 작동합니다.', icon: '/favicon.ico' });
+}
+
 function sendNotification(title, body, onClick) {
   if (!isNotificationEnabled()) return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
