@@ -418,7 +418,7 @@ async def run_pipeline(
                   f"({attempt + 1}/{_MAX_VOCAL_RETRY})", file=sys.stderr)
             await emitter.update(2, "running",
                 f"보컬 감지 실패, Step 1부터 재시도 ({attempt + 1}/{_MAX_VOCAL_RETRY})")
-            await _clean_step_files(project_id, 1)
+            await _clean_step_files(project_id, 1, reset=True)
             resume_from = 0  # 다음 루프에서 Step 1부터
 
 
