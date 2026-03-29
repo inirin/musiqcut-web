@@ -514,29 +514,48 @@ async def render_video(
     import shutil
     shutil.rmtree(str(norm_dir), ignore_errors=True)
 
-    # C2PA AI 생성 메타데이터 삽입 (Instagram AI 레이블 자동 감지용)
-    _embed_c2pa_manifest(out_path)
+    # AI 생성 메타데이터 삽입 (향후 플랫폼 자동 감지 대비)
+    # 현재 Instagram 영상은 자동 감지 미지원 (이미지만 지원, 영상은 앱 수동 레이블)
+    _embed_ai_metadata(out_path)
 
     return str(out_path)
 
 
-def _embed_c2pa_manifest(video_path: Path):
-    """c2patool로 C2PA AI 생성 manifest 삽입."""
+def _embed_ai_metadata(video_path: Path):
+    """C2PA + IPTC AI 생성 메타데이터 삽입."""
+    import sys
+
+    # 1) C2PA manifest (c2patool)
     c2patool = Path(__file__).resolve().parent.parent.parent / "vendor" / "c2patool" / "c2patool" / "c2patool.exe"
     manifest = Path(__file__).resolve().parent.parent / "assets" / "c2pa_manifest.json"
-    if not c2patool.exists():
-        print("[FFmpeg] c2patool 미설치 — C2PA 삽입 건너뜀", file=__import__('sys').stderr)
-        return
+    if c2patool.exists():
+        try:
+            tmp_out = video_path.with_suffix(".c2pa.mp4")
+            result = subprocess.run(
+                [str(c2patool), str(video_path), "-m", str(manifest), "-o", str(tmp_out), "--force"],
+                capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and tmp_out.exists():
+                tmp_out.replace(video_path)
+                print("[FFmpeg] C2PA AI manifest 삽입 완료", file=sys.stderr)
+            else:
+                print(f"[FFmpeg] C2PA 삽입 실패: {result.stderr[:200]}", file=sys.stderr)
+                tmp_out.unlink(missing_ok=True)
+        except Exception as e:
+            print(f"[FFmpeg] C2PA 삽입 에러: {e}", file=sys.stderr)
+
+    # 2) IPTC DigitalSourceType (FFmpeg metadata)
     try:
-        tmp_out = video_path.with_suffix(".c2pa.mp4")
-        result = subprocess.run(
-            [str(c2patool), str(video_path), "-m", str(manifest), "-o", str(tmp_out), "--force"],
-            capture_output=True, text=True, timeout=30)
-        if result.returncode == 0 and tmp_out.exists():
-            tmp_out.replace(video_path)
-            print(f"[FFmpeg] C2PA AI manifest 삽입 완료", file=__import__('sys').stderr)
+        tmp_iptc = video_path.with_suffix(".iptc.mp4")
+        result = subprocess.run([
+            "ffmpeg", "-y", "-i", str(video_path),
+            "-movflags", "use_metadata_tags",
+            "-metadata", "IPTC:DigitalSourceType=trainedAlgorithmicMedia",
+            "-c", "copy", str(tmp_iptc),
+        ], capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and tmp_iptc.exists():
+            tmp_iptc.replace(video_path)
+            print("[FFmpeg] IPTC AI 메타데이터 삽입 완료", file=sys.stderr)
         else:
-            print(f"[FFmpeg] C2PA 삽입 실패: {result.stderr[:200]}", file=__import__('sys').stderr)
-            tmp_out.unlink(missing_ok=True)
+            tmp_iptc.unlink(missing_ok=True)
     except Exception as e:
-        print(f"[FFmpeg] C2PA 삽입 에러: {e}", file=__import__('sys').stderr)
+        print(f"[FFmpeg] IPTC 삽입 에러: {e}", file=sys.stderr)

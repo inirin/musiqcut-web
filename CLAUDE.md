@@ -44,7 +44,7 @@ venv/Scripts/python.exe auto_generate.py
    - 비보컬/비주체 → **Wan 2.2 I2V** (`wan_video_service.py`)
    - 모두 ComfyUI API (localhost:8189)로 워크플로우 전송
    - 실행 중 클립 재생성 요청 시 abort 없이 파일 삭제 → 루프에서 자동 재생성 (누락 클립 체크)
-5. **Compositing** — FFmpeg로 클립 결합 + 노래방 스타일 2줄 교대 자막(ASS) + 오디오 합성 (`ffmpeg_service.py`)
+5. **Compositing** — FFmpeg로 클립 결합 + 노래방 스타일 2줄 교대 자막(ASS) + 오디오 합성 + C2PA/IPTC AI 메타데이터 삽입 (`ffmpeg_service.py`)
 
 ### Key Architectural Patterns
 - **Pipeline orchestration**: `pipeline_service.py`가 전체 5단계를 순차 실행, `resume_from` 파라미터로 특정 단계부터 재시작 가능
@@ -55,6 +55,8 @@ venv/Scripts/python.exe auto_generate.py
 - **S2V webp 재활용**: 서버 재시작으로 mp4 변환 전에 죽은 경우, 기존 ComfyUI 출력 webp를 변환만 수행
 - **Auto-generation scheduler**: 설정 간격마다 트렌드 기반 자동 생성, 서버 재시작 시 중단 작품 자동 resume, 비정상 종료 시 자동 복구, 중복 테마 30개 체크 (mood 포함), sleep 60초 분할
 - **Upload system**: YouTube/Instagram/TikTok 연동, source='auto' 작품만 자동 업로드, 해시태그 자동 포함, 플랫폼별 제목 포맷 (YouTube: 하이픈, Instagram/TikTok: 줄바꿈)
+- **Instagram**: OAuth Direct Login (api.instagram.com), video_url 방식 업로드, 임시 토큰 공개 URL (Cloudflare Access Bypass)
+- **AI 레이블**: C2PA + IPTC 메타데이터 자동 삽입 (영상은 Instagram 자동 감지 미지원, 앱 수동 설정 필요)
 - **Database**: SQLite (`pipeline.db`) via aiosqlite, 스키마는 `database.py`에서 앱 시작 시 자동 생성
 - **Config**: pydantic-settings로 `.env` 로드 (`backend/config.py`)
 
