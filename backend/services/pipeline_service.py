@@ -928,6 +928,9 @@ async def _run_pipeline_steps(
                         still_out = clip_path(project_id, sno)
                         await _ffmpeg_still_video(image_files[idx], still_out, duration=scene_dur)
                         clip_files[idx] = str(still_out)
+                    finally:
+                        # I2V 폴백 후 VRAM 정리 (다음 S2V 클립을 위해)
+                        await _free_comfyui_vram()
 
             async def _generate_i2v_clip(idx, scene):
                 """I2V 모션 클립 단건 생성 (폴백 포함)."""
