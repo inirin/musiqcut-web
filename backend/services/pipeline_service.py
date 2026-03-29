@@ -837,11 +837,18 @@ async def _run_pipeline_steps(
             wan_indices = [i for i in range(len(scenes)) if i not in s2v_indices]
 
             # 기존 클립 파일이 있으면 미리 채움 (재생성 시 다른 클립이 pending 안 되도록)
+            # 단, Step 3 이미지보다 오래된 클립은 무효 (이미지 재생성 후 잔존 클립)
             clip_files = [None] * len(scenes)
             for _ci, _sc in enumerate(scenes):
                 _cp = clip_path(project_id, _sc.scene_no)
                 if _cp.exists():
-                    clip_files[_ci] = str(_cp)
+                    _img = image_path(project_id, _sc.scene_no)
+                    if _img.exists() and _cp.stat().st_mtime < _img.stat().st_mtime:
+                        _cp.unlink()
+                        print(f"[STEP4] 구 클립 삭제 (이미지보다 오래됨): clip_{_sc.scene_no:02d}",
+                              file=sys.stderr)
+                    else:
+                        clip_files[_ci] = str(_cp)
 
             # 초기 클립 슬롯 — 실제 첫 처리 클립에 스피너
             init_slots = []
