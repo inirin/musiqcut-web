@@ -12,6 +12,35 @@ from backend.services import youtube_service, instagram_service, tiktok_service,
 
 router = APIRouter()
 
+# ── 임시 공개 비디오 URL (Instagram 업로드용) ──────────
+import secrets
+from pathlib import Path
+from fastapi.responses import FileResponse
+
+_temp_video_tokens: dict[str, tuple[str, float]] = {}  # token → (file_path, expires_ts)
+
+
+@router.get("/public-video/{token}")
+async def serve_public_video(token: str):
+    """임시 토큰으로 비디오 파일 서빙 (Cloudflare Access Bypass 경로)."""
+    import time
+    entry = _temp_video_tokens.get(token)
+    if not entry:
+        return {"error": "Invalid or expired token"}, 404
+    file_path, expires_ts = entry
+    if time.time() > expires_ts:
+        _temp_video_tokens.pop(token, None)
+        return {"error": "Token expired"}, 410
+    return FileResponse(file_path, media_type="video/mp4")
+
+
+def create_temp_video_url(video_path: str, ttl_sec: int = 600) -> str:
+    """임시 공개 URL 생성 (기본 10분 유효)."""
+    import time
+    token = secrets.token_urlsafe(32)
+    _temp_video_tokens[token] = (video_path, time.time() + ttl_sec)
+    return f"https://musiqcut.com/api/upload/public-video/{token}"
+
 
 # ── OAuth ────────────────────────────────────────
 

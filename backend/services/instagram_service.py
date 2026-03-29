@@ -128,10 +128,9 @@ async def upload_reels(
     caption: str,
 ) -> dict:
     """Instagram Reels 업로드 (video_url 방식)."""
-    # 공개 URL 생성 (Cloudflare Tunnel 경유)
-    from pathlib import PurePosixPath
-    rel_path = PurePosixPath(video_path.replace("\\", "/"))
-    video_url = f"https://musiqcut.com/{rel_path}"
+    # 임시 공개 URL 생성 (Cloudflare Access Bypass 경로, 10분 유효)
+    from backend.routers.upload import create_temp_video_url
+    video_url = create_temp_video_url(video_path)
 
     async with httpx.AsyncClient(timeout=300) as client:
         # 1) 미디어 컨테이너 생성 (video_url 방식)
