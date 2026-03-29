@@ -24,14 +24,8 @@ async def extract_lyrics_timestamps(
         [{"text": "가사", "start": 0.0, "end": 5.0,
           "words": [...], "has_vocal": True}, ...]
     """
-    from backend.services.lipsync_precheck import separate_vocals
-
-    # 1) 보컬 분리
-    vocals_path = await separate_vocals(audio_path, demucs_dir)
-    print(f"[LyricsSync] 보컬 분리 완료: {vocals_path}", file=sys.stderr)
-
-    # 2) Whisper 전사 → 단어 타임스탬프
-    raw_segments = await asyncio.to_thread(_transcribe_vocals, vocals_path)
+    # 1) Whisper 전사 → 단어 타임스탬프 (원본 mp3 직접 사용, demucs 보컬분리 제거)
+    raw_segments = await asyncio.to_thread(_transcribe_vocals, audio_path)
     all_words = []
     for seg in raw_segments:
         for w in seg.get("words", []):
@@ -78,6 +72,25 @@ async def extract_lyrics_timestamps(
             "has_vocal": len(words_in) > 0,
         })
 
+    # 마지막 보컬 세그먼트 환각 감지: 원문 가사와 단어 겹침 체크
+    # (환각은 거의 항상 끝에서 발생 — 원문에 없는 단어면 환각)
+    import re as _re
+    lyrics_words_set = set(_re.sub(r'[.,!?;:~…\"\'\-\[\]]+', '', lyrics_text).lower().split())
+    for sg in reversed(segments):
+        if sg["has_vocal"]:
+            seg_words = [w["text"].lower() for w in sg.get("words", [])]
+            if not seg_words:
+                break
+            overlap = sum(1 for w in seg_words if w in lyrics_words_set)
+            ratio = overlap / len(seg_words)
+            if ratio == 0:
+                print(f"[LyricsSync] 마지막 세그먼트 환각 제거 (원문 겹침 {ratio:.0%}): "
+                      f"'{sg['text'][:30]}'", file=sys.stderr)
+                sg["text"] = ""
+                sg["words"] = []
+                sg["has_vocal"] = False
+            break
+
     vocal_count = sum(1 for sg in segments if sg["has_vocal"])
     print(f"[LyricsSync] {n_clips}개 세그먼트 (보컬 {vocal_count}개, "
           f"시작 {vocal_start:.1f}초)", file=sys.stderr)
@@ -101,26 +114,41 @@ def _transcribe_vocals(vocals_path: str) -> list[dict]:
     # 1) faster-whisper로 텍스트 + 대략적 세그먼트 추출
     from faster_whisper import WhisperModel
     model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-    segments, info = model.transcribe(
-        vocals_path,
-        language="ko",
-        word_timestamps=True,
-        vad_filter=False,
-        condition_on_previous_text=False,  # 환각 전파 방지
-    )
+
+    # 1차: condition_on_previous_text=False (환각 방지)
+    # 결과 0이면 2차: True로 재시도 (반주 강한 곡 대응)
     raw_segments = []
-    for seg in segments:
-        # 환각 필터링: 압축률 비정상이면 스킵 (반복 환각)
-        # no_speech_prob는 노래 보컬에서 오탐이 심해 사용하지 않음
-        if seg.compression_ratio > 2.4:
-            print(f"[LyricsSync] 환각 스킵 (compress={seg.compression_ratio:.1f}): "
-                  f"'{seg.text.strip()[:30]}'", file=sys.stderr)
-            continue
-        entry = {"text": seg.text.strip(), "start": seg.start, "end": seg.end}
-        if seg.words:
-            entry["words"] = [{"text": w.word.strip(), "start": w.start, "end": w.end}
-                              for w in seg.words if w.word.strip()]
-        raw_segments.append(entry)
+    for attempt, cond in enumerate([False, True]):
+        segments, info = model.transcribe(
+            vocals_path,
+            language="ko",
+            word_timestamps=True,
+            vad_filter=False,
+            condition_on_previous_text=cond,
+        )
+        raw_segments = []
+        for seg in segments:
+            # 환각 필터링: 압축률 비정상이면 스킵 (반복 환각)
+            # no_speech_prob는 노래 보컬에서 오탐이 심해 사용하지 않음
+            if seg.compression_ratio > 2.4:
+                print(f"[LyricsSync] 환각 스킵 (compress={seg.compression_ratio:.1f}): "
+                      f"'{seg.text.strip()[:30]}'", file=sys.stderr)
+                continue
+            text = seg.text.strip()
+            entry = {"text": text, "start": seg.start, "end": seg.end}
+            if seg.words:
+                entry["words"] = [{"text": w.word.strip(), "start": w.start, "end": w.end}
+                                  for w in seg.words if w.word.strip()]
+            raw_segments.append(entry)
+
+        if raw_segments:
+            if attempt > 0:
+                print(f"[LyricsSync] fallback(condition_on_previous_text=True)으로 {len(raw_segments)}개 세그먼트 감지",
+                      file=sys.stderr)
+            break
+        else:
+            print("[LyricsSync] 세그먼트 0개, condition_on_previous_text=True로 재시도",
+                  file=sys.stderr)
 
     # 2) whisperx forced alignment으로 단어 타임스탬프 보정
     try:

@@ -114,7 +114,6 @@ async def upload_shorts(
     access_token: str,
     video_path: str,
     title: str,
-    description: str,
     tags: list[str] = None,
 ) -> dict:
     """YouTube Shorts 업로드 (resumable upload). video_id와 URL 반환."""
@@ -125,7 +124,6 @@ async def upload_shorts(
     metadata = {
         "snippet": {
             "title": title[:100],
-            "description": description,
             "tags": tags or [],
             "categoryId": "10",  # Music
         },

@@ -83,6 +83,7 @@ venv/Scripts/python.exe auto_generate.py
 - S2V 오디오: 보컬 분리 → 16kHz mono WAV 변환 필수
 - 비디오 해상도: 576x1024 (9:16 세로), 24fps 최종 출력
 - 자동/수동 작품 구분: `projects.source` 컬럼 ('auto' / 'manual')
+- **프론트엔드 CSS 작업 시 `frontend/STYLE_GUIDE.md` 반드시 참조**, 새 패턴/규칙 추가 시 스타일 가이드도 함께 보강
 
 ## Infrastructure
 - **도메인**: musiqcut.com (Cloudflare Tunnel + Access Google 로그인)

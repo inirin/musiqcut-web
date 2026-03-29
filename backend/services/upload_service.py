@@ -72,23 +72,17 @@ def generate_metadata(title: str, theme: str, project_id: str = None) -> dict:
         hashtags = ["#뮤직컷", "#AI뮤직비디오", "#Shorts", "#AI", "#MusicVideo"]
 
     hashtag_line = " ".join(hashtags)
-
-    description = (
-        f"{desc_part}\n\n"
-        f"세상 모든 것을 노래합니다.\n\n"
-        f"{hashtag_line}"
-    )
-
+    # 인스타/틱톡용 캡션: 제목 + 테마설명 + 해시태그
+    caption = f"{title}\n{desc_part}\n\n{hashtag_line}"
     # YouTube tags (# 제거)
     tags = [h.lstrip("#") for h in hashtags]
-    return {"title": upload_title, "title_flat": upload_title_flat, "description": description, "tags": tags}
+    return {"title": upload_title, "title_flat": upload_title_flat, "caption": caption, "tags": tags}
 
 
 async def create_and_execute_upload(
     project_id: str,
     platform: str = "youtube",
     custom_title: str = None,
-    custom_description: str = None,
 ) -> dict:
     """업로드 생성 + 실행."""
     from backend.services import youtube_service, instagram_service, tiktok_service
@@ -122,12 +116,9 @@ async def create_and_execute_upload(
 
     # 메타데이터 생성
     meta = generate_metadata(project["title"], project["theme"], project_id)
-    # YouTube는 제목 줄바꿈 미지원 → title_flat 사용
-    if platform == "youtube":
-        title = custom_title or meta["title_flat"]
-    else:
-        title = custom_title or meta["title"]
-    description = custom_description or meta["description"]
+    # 플랫폼별 메타데이터
+    title = custom_title or meta["title_flat"]
+    caption = meta["caption"]
     tags = meta["tags"]
 
     # uploads 레코드 생성
@@ -135,7 +126,7 @@ async def create_and_execute_upload(
         cursor = await db.execute(
             "INSERT INTO uploads (project_id, platform, title, description, tags, status) "
             "VALUES (?, ?, ?, ?, ?, 'uploading')",
-            (project_id, platform, title, description, json.dumps(tags))
+            (project_id, platform, title, caption, json.dumps(tags))
         )
         upload_id = cursor.lastrowid
         await db.commit()
@@ -145,18 +136,16 @@ async def create_and_execute_upload(
         if platform == "youtube":
             access_token = await youtube_service.ensure_valid_token(account)
             result = await youtube_service.upload_shorts(
-                access_token, project["video_path"], title, description, tags
+                access_token, project["video_path"], title, tags
             )
         elif platform == "instagram":
             access_token = await instagram_service.ensure_valid_token(account)
-            caption = f"{title}\n\n{description}"
             result = await instagram_service.upload_reels(
                 access_token, account["channel_id"],
                 project["video_path"], caption
             )
         elif platform == "tiktok":
             access_token = await tiktok_service.ensure_valid_token(account)
-            caption = f"{title} {description}"
             result = await tiktok_service.upload_video(
                 access_token, project["video_path"], caption[:150]
             )

@@ -61,9 +61,9 @@ async function _loadAllPlatformSettings() {
       const dot = document.getElementById(p.dot);
       const desc = document.getElementById(p.desc);
       const actions = document.getElementById(p.actions);
-      if (desc) desc.textContent = `작품을 ${p.label}로 업로드합니다`;
       if (data.connected) {
-        if (dot) { dot.textContent = `● ${data.channel_title} 연결됨`; dot.style.color = 'var(--success)'; }
+        if (dot) { dot.textContent = '● 연결됨'; dot.style.color = 'var(--success)'; }
+        if (desc) desc.textContent = data.channel_title || p.label;
         if (actions) actions.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="disconnectPlatform('${p.key}')">연결 해제</button>`;
       } else {
         if (dot) { dot.textContent = '● 미연결'; dot.style.color = 'var(--text-muted)'; }

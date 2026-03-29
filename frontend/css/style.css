@@ -478,7 +478,7 @@ textarea { resize: vertical; min-height: 80px; }
 .upload-btn-grid .btn { width: 100%; display: block; text-align: center; font-size: var(--text-xs) !important; padding: 8px 2px !important; box-sizing: border-box; word-break: keep-all; line-height: 1.3; }
 .platform-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .platform-grid .card { margin-bottom: 0; }
-.platform-card { display: flex; flex-direction: column; }
+.card.platform-card { display: flex; flex-direction: column; padding-bottom: 8px; }
 .platform-card .setting-desc { margin: 0 0 auto; }
 .platform-section {
   display: flex; align-items: center; justify-content: space-between;
@@ -486,6 +486,7 @@ textarea { resize: vertical; min-height: 80px; }
   border-top: 1px solid var(--border);
 }
 .platform-section .status-dot-label { align-self: center; }
+.platform-section .btn { white-space: nowrap; }
 .platform-label { font-size: var(--text-sm); color: var(--text-muted); }
 .setting-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .setting-guide {
@@ -521,6 +522,7 @@ textarea { resize: vertical; min-height: 80px; }
   .setting-header { flex-direction: column; gap: 6px; }
   .status-dot-label { align-self: flex-start; }
   .setting-actions .btn { flex: 1; justify-content: center; }
+  .card.platform-card { padding: 16px; padding-bottom: 8px; }
 }
 
 /* ══════════════════════════════════════════

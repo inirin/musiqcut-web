@@ -134,12 +134,10 @@ async function loadResult() {
   const videoCard = document.getElementById('result-video-card');
   const videoEl = document.getElementById('result-video');
   if (project.status === 'done') {
-    const videoOk = await fetch(videoUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false);
+    const cacheBust = `?t=${Date.now()}`;
+    const videoOk = await fetch(videoUrl + cacheBust, { method: 'HEAD' }).then(r => r.ok).catch(() => false);
     if (videoOk) {
-      if (_lastLoadedProjectId !== id || videoCard.classList.contains('hidden')) {
-        videoEl.src = videoUrl + `?t=${Date.now()}`;
-        // result-download는 upload-buttons 그리드 안에서 렌더링
-      }
+      videoEl.src = videoUrl + cacheBust;
       videoCard.classList.remove('hidden');
       if (typeof _loadUploadButtons === 'function') _loadUploadButtons(id);
       if (typeof loadFeedbackList === 'function') loadFeedbackList(id);

@@ -136,7 +136,10 @@ gap: 16px;                         /* 카드 그리드 간격 */
 
 ### 플랫폼 카드 (`.platform-card`)
 - 카드 내부 flex column, 설명은 `margin-bottom: auto`로 하단 정렬
+- `padding-bottom: 8px` (카드 기본 20px 대신, 마지막 섹션과의 간격 축소)
+- 모바일: `padding: 16px; padding-bottom: 8px`
 - `.platform-section`: 카드 내 행 구분 (`border-top` + `space-between`)
+- `.platform-section .btn`: `white-space: nowrap` (버튼 텍스트 줄바꿈 방지)
 
 ### 카드 내 행 (`.platform-section`)
 ```css

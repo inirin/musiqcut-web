@@ -47,7 +47,7 @@ async function _loadUploadButtons(projectId) {
     const uploads = statusData.uploads || [];
     // 다운로드는 HTML에서 별도 렌더링
     const dlBtn = document.getElementById('result-download');
-    if (dlBtn) dlBtn.href = `/storage/projects/${projectId}/video/final.mp4`;
+    if (dlBtn) dlBtn.href = `/storage/projects/${projectId}/video/final.mp4?t=${Date.now()}`;
     let html = '';
     let hasAny = false;
 

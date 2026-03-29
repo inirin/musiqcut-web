@@ -203,36 +203,102 @@ async def _merge_audio_to_clip(clip_path: str, audio_path: str,
         raise RuntimeError(result.stderr[-200:])
 
 
+def _apply_corrected_words(timed_lines: list, original_words: list, corrected_words: list):
+    """보정된 단어를 원본 타이밍에 매핑. SequenceMatcher로 정렬하여 타이밍 보존."""
+    from difflib import SequenceMatcher
+
+    orig_texts = [w["text"].lower() for w in original_words]
+    corr_texts = [w.lower() for w in corrected_words]
+
+    # 매칭: 원본 단어 인덱스 → 보정 단어 매핑
+    matcher = SequenceMatcher(None, orig_texts, corr_texts)
+    # 결과: 원본 인덱스별 새 단어 리스트 (삽입 포함)
+    new_words_flat = []
+    for op, i1, i2, j1, j2 in matcher.get_opcodes():
+        if op == "equal":
+            # 매칭 → 원본 타이밍 유지, 텍스트만 보정본으로
+            for k, oi in enumerate(range(i1, i2)):
+                w = original_words[oi].copy()
+                w["text"] = corrected_words[j1 + k]
+                new_words_flat.append(w)
+        elif op == "replace":
+            # 대체 → 원본 시간 범위에 보정 단어들 배분
+            t_start = original_words[i1]["start"]
+            t_end = original_words[i2 - 1]["end"]
+            n = j2 - j1
+            step = (t_end - t_start) / n if n > 0 else 0
+            for k in range(n):
+                new_words_flat.append({
+                    "text": corrected_words[j1 + k],
+                    "start": round(t_start + k * step, 3),
+                    "end": round(t_start + (k + 1) * step, 3),
+                })
+        elif op == "insert":
+            # 삽입 → 이전 단어와 다음 단어 사이 시간에 배분
+            if new_words_flat:
+                t_start = new_words_flat[-1]["end"]
+            elif i1 < len(original_words):
+                t_start = original_words[i1]["start"]
+            else:
+                t_start = 0.0
+            if i1 < len(original_words):
+                t_end = original_words[i1]["start"]
+            elif new_words_flat:
+                t_end = t_start + 0.5
+            else:
+                t_end = t_start + 0.5
+            if t_end <= t_start:
+                t_end = t_start + 0.3
+            n = j2 - j1
+            step = (t_end - t_start) / n if n > 0 else 0
+            for k in range(n):
+                new_words_flat.append({
+                    "text": corrected_words[j1 + k],
+                    "start": round(t_start + k * step, 3),
+                    "end": round(t_start + (k + 1) * step, 3),
+                })
+        elif op == "delete":
+            # 삭제 → 원본 단어 스킵 (Gemini가 제거한 것)
+            pass
+
+    # 평탄화된 words를 세그먼트에 재배분 (시간 기준)
+    for sg in timed_lines:
+        s, e = sg["start"], sg["end"]
+        sg["words"] = [w for w in new_words_flat if s <= w["start"] < e]
+
+    print(f"[LyricsSync] 단어 매핑 완료: 원본 {len(original_words)}개 → 보정 {len(new_words_flat)}개",
+          file=sys.stderr)
+
+
 async def _correct_lyrics_with_gemini(raw_lyrics: list[str], story_text: str) -> list[str]:
     """Gemini Flash로 Whisper 가사 오타 보정."""
     from backend.utils.gemini_client import gemini_generate
 
-    prompt = f"""AI 음성 인식(Whisper)으로 추출한 한국어 노래 가사를 스토리/컨셉 원문과 비교하여 교정하세요.
+    whisper_joined = " ".join(raw_lyrics)
+    prompt = f"""AI 음성 인식(Whisper)으로 추출한 한국어 노래 가사를 원본 가사와 비교하여 교정하세요.
+전체 가사의 흐름을 보고 교정해주세요.
 
 규칙:
-- 스토리/컨셉에 나오는 단어와 발음이 비슷한 Whisper 오인식을 적극 교정 (예: "곤 엮고" → "곤룡포", "벌" → "궁궐")
-- 스토리/컨셉에 등장하는 고유명사, 키워드를 우선 매칭하세요
-- 원문에 있는 단어가 Whisper에서 누락된 경우, 해당 줄 끝에 추가하세요 (예: 원문 "꿈을 쏳아올린 빛" → Whisper "꿈을 쏴올려" → 보정 "꿈을 쏳아올린 빛")
-- 원문에 없는 내용을 새로 만들지 마세요
-- 줄 수를 반드시 {len(raw_lyrics)}줄로 유지하세요
-- 다른 설명 없이 보정된 가사만 줄바꿈으로 출력하세요
+- 원본에 나오는 단어와 발음이 비슷한 Whisper 오인식을 적극 교정 (예: "곤 엮고" → "곤룡포", "벌" → "궁궐", "나카라코코" → "마스카라 콕콕")
+- 원본에 등장하는 고유명사, 키워드를 우선 매칭하세요
+- 원본에 있는 단어가 Whisper에서 누락된 경우 추가 가능 (예: "꿈을 쏴올려" → "꿈을 쏘아올린 빛")
+- 단, **맨 끝**에는 누락 단어를 추가하지 마세요 (녹음에서 잘린 부분일 수 있음)
+- 보컬라이즈/허밍(오 아 Oh 등)은 그대로 유지하세요 (삭제하지 마세요)
+- 원본에 없는 내용을 새로 만들지 마세요
+- 보정된 가사를 공백으로 구분된 단어 나열로 출력하세요 (줄바꿈 없이 한 줄로)
 
 [원본 가사]
 {story_text[:500]}
 
-[Whisper 추출 가사 ({len(raw_lyrics)}줄)]
-{chr(10).join(raw_lyrics)}"""
+[Whisper 추출 가사]
+{whisper_joined}"""
 
     resp = await gemini_generate(
         model="gemini-2.5-flash",
         contents=prompt)
-    lines = [l.strip() for l in resp.text.strip().split('\n') if l.strip()]
-    # 줄 수가 다르면 Gemini가 지어낸 것 → 원본 유지
-    if len(lines) != len(raw_lyrics):
-        print(f"[LyricsSync] Gemini 보정 줄 수 불일치 ({len(lines)} vs {len(raw_lyrics)}), 원본 유지",
-              file=sys.stderr)
-        return raw_lyrics
-    return lines
+    result = resp.text.strip().replace("\n", " ").strip()
+    print(f"[LyricsSync] Gemini 보정: '{result[:60]}...'", file=sys.stderr)
+    return result.split()
 
 
 async def _clean_step_files(project_id: str, from_step: int, reset: bool = False):
@@ -241,10 +307,11 @@ async def _clean_step_files(project_id: str, from_step: int, reset: bool = False
     pdir = Path(lyrics_path(project_id)).parent
 
     if from_step <= 2:
-        mp = music_path(project_id)
-        if mp.exists():
-            mp.unlink()
-        # demucs 캐시 삭제 (새 음원이면 보컬 분리도 새로)
+        if reset:
+            mp = music_path(project_id)
+            if mp.exists():
+                mp.unlink()
+        # demucs 캐시 삭제 (Whisper 재분석용)
         demucs_dir = pdir / "demucs"
         if demucs_dir.exists():
             shutil.rmtree(demucs_dir, ignore_errors=True)
@@ -395,7 +462,7 @@ async def _run_pipeline_steps(
         # ── STEP 2: 음악 생성 → 곡 길이 측정 → scene_count 결정 ──
         current_step = 2
         audio = music_path(project_id)
-        if 2 in completed and audio.exists():
+        if audio.exists():
             audio_file = str(audio)
             actual_duration = await measure_audio_duration(audio_file)
             scene_count = max(3, round(actual_duration / get_clip_duration()))
@@ -471,45 +538,7 @@ async def _run_pipeline_steps(
                           file=sys.stderr)
                     raise _VocalDetectionError()
 
-            # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만)
-            if not _cached_lyrics:
-                if resume_from <= 2:
-                    await emitter.update(2, "running", "가사 보정 중... (Gemini Flash)")
-                raw_lyrics = [sg["text"] for sg in timed_lines if sg["text"].strip()]
-                try:
-                    corrected = await _correct_lyrics_with_gemini(
-                        raw_lyrics, lyrics)
-                    ci = 0
-                    for sg in timed_lines:
-                        if sg["text"].strip() and ci < len(corrected):
-                            old_text = sg["text"]
-                            sg["text"] = corrected[ci]
-                            # words 텍스트도 보정 (단어 수 동일하면 1:1, 다르면 균등 배분)
-                            words = sg.get("words", [])
-                            if words and corrected[ci].strip():
-                                import re as _re
-                                new_words = [_re.sub(r'[.,!?;:~…\"\'\-]+', '', w).strip()
-                                             for w in corrected[ci].split()]
-                                new_words = [w for w in new_words if w]
-                                if len(new_words) == len(words):
-                                    for wi, nw in enumerate(new_words):
-                                        words[wi]["text"] = nw
-                                else:
-                                    # 단어 수 불일치 → 타이밍 균등 배분
-                                    t_start = words[0]["start"]
-                                    t_end = words[-1]["end"]
-                                    step = (t_end - t_start) / len(new_words) if new_words else 0
-                                    sg["words"] = [
-                                        {"text": nw,
-                                         "start": round(t_start + j * step, 3),
-                                         "end": round(t_start + (j + 1) * step, 3)}
-                                        for j, nw in enumerate(new_words)]
-                            ci += 1
-                    print(f"[LyricsSync] Gemini 가사 보정 완료 ({ci}줄)", file=sys.stderr)
-                except Exception as e:
-                    print(f"[LyricsSync] Gemini 보정 실패 (원본 사용): {e}", file=sys.stderr)
-
-            # scene_count와 timed_lines 동기화
+            # scene_count와 timed_lines 동기화 (트리밍을 보정 전에 수행)
             if len(timed_lines) > scene_count:
                 # 초과 세그먼트 제거 (마지막 세그먼트의 end를 곡 끝으로)
                 timed_lines = timed_lines[:scene_count]
@@ -519,6 +548,40 @@ async def _run_pipeline_steps(
                       file=sys.stderr)
             elif len(timed_lines) < scene_count:
                 scene_count = len(timed_lines)
+
+            # Gemini Flash로 가사 오타 보정 (캐시 아닐 때만, 트리밍 후)
+            if not _cached_lyrics:
+                if resume_from <= 2:
+                    await emitter.update(2, "running", "가사 보정 중... (Gemini Flash)")
+                raw_lyrics = [sg["text"] for sg in timed_lines if sg["text"].strip() and sg.get("words")]
+                try:
+                    corrected_words_raw = await _correct_lyrics_with_gemini(
+                        raw_lyrics, lyrics)
+                    # 구두점 제거
+                    import re as _re
+                    _strip_punct = lambda w: _re.sub(r'[.,!?;:~…\"\'\-]+', '', w).strip()
+                    corrected_words = [_strip_punct(w) for w in corrected_words_raw if _strip_punct(w)]
+                    # 원본 words 평탄화
+                    original_words = []
+                    for sg in timed_lines:
+                        if sg.get("words"):
+                            original_words.extend(sg["words"])
+                    # SequenceMatcher로 원본↔보정 정렬, 타이밍 보존
+                    _apply_corrected_words(timed_lines, original_words, corrected_words)
+                    # 세그먼트 text도 words에서 재구성
+                    for sg in timed_lines:
+                        words = sg.get("words", [])
+                        sg["text"] = " ".join(w["text"] for w in words) if words else ""
+                        sg["has_vocal"] = len(words) > 0
+                    # scenes의 vocal_lines도 보정된 text로 동기화
+                    script_tmp = _read_lyrics(project_id)
+                    for si, sc_d in enumerate(script_tmp.get("scenes", [])):
+                        if si < len(timed_lines) and timed_lines[si]["text"].strip():
+                            sc_d["vocal_lines"] = [timed_lines[si]["text"]]
+                    _write_lyrics(project_id, script_tmp)
+                    print(f"[LyricsSync] Gemini 가사 보정 완료 ({ci}줄)", file=sys.stderr)
+                except Exception as e:
+                    print(f"[LyricsSync] Gemini 보정 실패 (원본 사용): {e}", file=sys.stderr)
             for sg in timed_lines:
                 label = sg["text"][:30] if sg["text"] else "(instrumental)"
                 vocal = "♪" if sg["has_vocal"] else " "
