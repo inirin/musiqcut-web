@@ -57,50 +57,29 @@ async def _trim_with_fadeout(file_path: str, max_sec: float,
 
 
 async def _trim_long_intro(file_path: str, max_intro_sec: float = 5.0):
-    """Demucs 보컬 분리 → 보컬 트랙 Whisper → 인트로 트림.
-
-    원본 mix에서는 보컬이 악기에 묻혀 Whisper가 감지 못할 수 있으므로
-    반드시 보컬 분리 후 분석한다.
-    """
+    """원본 mp3로 Whisper 분석 → 인트로 트림 (Demucs 미사용)."""
     import shutil
-    import tempfile
 
     try:
-        # 1) 임시 디렉토리에 Demucs 보컬 분리
-        tmp_demucs = tempfile.mkdtemp(prefix="intro_trim_")
-        print(f"[STEP2] 인트로 분석: Demucs 보컬 분리 중...", file=sys.stderr)
-        cmd_demucs = [
-            sys.executable, "-m", "demucs",
-            "--two-stems=vocals",
-            "-o", tmp_demucs,
-            str(Path(file_path).resolve()),
-        ]
-        proc = await asyncio.to_thread(
-            subprocess.run, cmd_demucs, capture_output=True, text=True)
-
-        stem_name = Path(file_path).stem
-        vocals_path = Path(tmp_demucs) / "htdemucs" / stem_name / "vocals.wav"
-        if proc.returncode != 0 or not vocals_path.exists():
-            print(f"[STEP2] 보컬 분리 실패 — 인트로 트림 건너뜀", file=sys.stderr)
-            shutil.rmtree(tmp_demucs, ignore_errors=True)
-            return
-
-        # 2) 보컬 트랙으로 Whisper 분석
+        # 원본 mp3로 직접 Whisper 분석 (Demucs 불필요 — 인트로 시작점만 찾으면 됨)
+        print(f"[STEP2] 인트로 분석: Whisper 보컬 시작점 감지 중...", file=sys.stderr)
         from faster_whisper import WhisperModel
         model = WhisperModel("base", device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(
-            str(vocals_path), language="ko", vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=300))
+        # fallback: condition_on_previous_text False → True
         first_seg = None
-        for seg in segments:
-            first_seg = seg
-            break
-
-        shutil.rmtree(tmp_demucs, ignore_errors=True)
+        for cond in [False, True]:
+            segments, _ = model.transcribe(
+                file_path, language="ko", vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=300),
+                condition_on_previous_text=cond)
+            for seg in segments:
+                first_seg = seg
+                break
+            if first_seg is not None:
+                break
 
         if first_seg is None:
-            print(f"[STEP2] 보컬 트랙에서도 보컬 미감지 — 트림 건너뜀",
-                  file=sys.stderr)
+            print(f"[STEP2] 보컬 미감지 — 트림 건너뜀", file=sys.stderr)
             return
 
         vocal_start = first_seg.start
