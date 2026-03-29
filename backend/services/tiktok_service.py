@@ -128,7 +128,7 @@ async def upload_video(
     async with httpx.AsyncClient(timeout=300) as client:
         # 1) 업로드 초기화
         init_resp = await client.post(
-            f"{TT_API}/post/publish/inbox/video/init/",
+            f"{TT_API}/post/publish/video/init/",
             json={
                 "post_info": {
                     "title": title[:150],
@@ -149,7 +149,9 @@ async def upload_video(
                 "Content-Type": "application/json; charset=UTF-8",
             },
         )
-        init_resp.raise_for_status()
+        if init_resp.status_code != 200:
+            print(f"[TikTok] 초기화 실패: {init_resp.status_code} {init_resp.text}", file=sys.stderr)
+            init_resp.raise_for_status()
         init_data = init_resp.json()
 
         if init_data.get("error", {}).get("code") != "ok":
