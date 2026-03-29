@@ -119,11 +119,13 @@ async function _uploadToPlatform(projectId, platform) {
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
             toast(`${label} 업로드 완료!`, 'success');
+            sendNotification(`${label} 업로드 완료`, '영상이 업로드되었습니다.');
           } else if (u && u.status === 'failed') {
             clearInterval(pollUpload);
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
             toast(`${label} 업로드 실패`, 'error');
+            sendNotification(`${label} 업로드 실패`, '업로드 중 오류가 발생했습니다.');
           }
         } catch {}
       }, 3000);
@@ -355,8 +357,15 @@ function handlePipelineEvent(evt) {
     if (evt.started_at) d.started_at = evt.started_at;
     if (evt.finished_at) d.finished_at = evt.finished_at;
     updateStepUI(evt.step, evt.status, evt.message, d);
+    // Step 1 시작 알림
+    if (evt.status === 'running' && evt.step === 1) {
+      sendNotification('작품 생성 시작', evt.message || '새 작품을 생성합니다.');
+    }
     if (evt.status === 'running' && evt.step === 4) startResourceMonitor(evt.step);
-    if (evt.status === 'done' && evt.step === 4) stopResourceMonitor();
+    if (evt.status === 'done' && evt.step === 4) {
+      stopResourceMonitor();
+      sendNotification('클립 생성 완료', '영상 클립이 모두 생성되었습니다.');
+    }
   }
 
   if (evt.type === 'complete') {
