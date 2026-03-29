@@ -89,9 +89,9 @@ async function togglePlatformAutoUpload(platform, enabled) {
   try {
     await fetch(`/api/upload/auto-upload/${platform}?enabled=${enabled}`, { method: 'POST' });
     const label = {youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok'}[platform];
-    showToast(`${label} 자동 업로드 ${enabled ? '활성화' : '비활성화'}`, 'success');
+    toast(`${label} 자동 업로드 ${enabled ? '활성화' : '비활성화'}`, 'success');
   } catch (e) {
-    showToast('설정 변경 실패', 'error');
+    toast('설정 변경 실패', 'error');
   }
 }
 

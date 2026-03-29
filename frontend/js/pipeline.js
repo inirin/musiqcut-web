@@ -108,7 +108,7 @@ async function _uploadToPlatform(projectId, platform) {
     const res = await fetch(`/api/upload/${projectId}/upload/${platform}`, { method: 'POST' });
     const data = await res.json();
     if (data.ok) {
-      showToast(`${label} 업로드를 시작합니다`, 'success');
+      toast(`${label} 업로드를 시작합니다`, 'success');
       // 완료될 때까지 폴링
       const pollUpload = setInterval(async () => {
         try {
@@ -118,22 +118,22 @@ async function _uploadToPlatform(projectId, platform) {
             clearInterval(pollUpload);
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
-            showToast(`${label} 업로드 완료!`, 'success');
+            toast(`${label} 업로드 완료!`, 'success');
           } else if (u && u.status === 'failed') {
             clearInterval(pollUpload);
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
-            showToast(`${label} 업로드 실패`, 'error');
+            toast(`${label} 업로드 실패`, 'error');
           }
         } catch {}
       }, 3000);
     } else {
-      showToast(data.error || '업로드 실패', 'error');
+      toast(data.error || '업로드 실패', 'error');
       _uploadingPlatforms.delete(platform);
       _loadUploadButtons(projectId);
     }
   } catch (e) {
-    showToast('업로드 요청 실패', 'error');
+    toast('업로드 요청 실패', 'error');
     _uploadingPlatforms.delete(platform);
     _loadUploadButtons(projectId);
   }

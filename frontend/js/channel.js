@@ -102,7 +102,7 @@ function connectPlatform(platform) {
     .then(r => r.json())
     .then(data => {
       if (!data.ok) {
-        showToast(data.error || `${_platformNames[platform]} 설정이 필요합니다`, 'error');
+        toast(data.error || `${_platformNames[platform]} 설정이 필요합니다`, 'error');
         return;
       }
       const popup = window.open(data.url, `${platform}-auth`, 'width=500,height=700');
@@ -110,9 +110,9 @@ function connectPlatform(platform) {
         if (e.data && e.data.type === `${platform}-auth`) {
           window.removeEventListener('message', handler);
           if (e.data.ok) {
-            showToast(`${_platformNames[platform]} 연결 완료`, 'success');
+            toast(`${_platformNames[platform]} 연결 완료`, 'success');
           } else {
-            showToast(e.data.error || `${_platformNames[platform]} 연결 실패`, 'error');
+            toast(e.data.error || `${_platformNames[platform]} 연결 실패`, 'error');
           }
           if (typeof loadChannel === 'function') loadChannel();
           if (typeof _loadAllPlatformSettings === 'function') _loadAllPlatformSettings();
@@ -126,7 +126,7 @@ function connectYouTube() { connectPlatform('youtube'); }
 async function disconnectPlatform(platform) {
   if (!confirm(`${_platformNames[platform]} 연결을 해제하시겠습니까?`)) return;
   await fetch(`/api/upload/${platform}/account`, { method: 'DELETE' });
-  showToast(`${_platformNames[platform]} 연결 해제됨`, 'success');
+  toast(`${_platformNames[platform]} 연결 해제됨`, 'success');
   if (typeof loadChannel === 'function') loadChannel();
   if (typeof _loadAllPlatformSettings === 'function') _loadAllPlatformSettings();
 }
