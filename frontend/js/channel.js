@@ -97,7 +97,8 @@ async function _loadUploadHistory() {
 const _platformNames = { youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok' };
 
 function connectPlatform(platform) {
-  // YouTube는 기존 connectYouTube 호환
+  const label = _platformNames[platform] || platform;
+  if (!confirm(`${label} 계정을 연결하시겠습니까?`)) return;
   fetch(`/api/upload/${platform}/auth-url`)
     .then(r => r.json())
     .then(data => {
