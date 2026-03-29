@@ -244,7 +244,7 @@ async def instagram_callback(code: str = "", error: str = ""):
         access_token = token_data["access_token"]
         expires_at = (datetime.utcnow() + timedelta(seconds=token_data["expires_in"])).isoformat()
 
-        ig_account = await instagram_service.get_ig_account(access_token)
+        ig_account = await instagram_service.get_ig_account(access_token, token_data.get("user_id", ""))
 
         async with aiosqlite.connect(DB_PATH) as db:
             existing = await (await db.execute(

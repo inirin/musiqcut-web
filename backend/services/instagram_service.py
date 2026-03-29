@@ -10,15 +10,15 @@ import httpx
 from backend.config import settings
 from backend.database import DB_PATH
 
-META_AUTH_URL = "https://www.facebook.com/v22.0/dialog/oauth"
-META_TOKEN_URL = "https://graph.facebook.com/v22.0/oauth/access_token"
-GRAPH_API = "https://graph.facebook.com/v22.0"
+IG_AUTH_URL = "https://api.instagram.com/oauth/authorize"
+IG_TOKEN_URL = "https://api.instagram.com/oauth/access_token"
+GRAPH_API = "https://graph.instagram.com"
 
-SCOPES = "instagram_basic,instagram_content_publish,pages_read_engagement"
+SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages"
 
 
 def get_auth_url(state: str = "") -> str:
-    """Meta OAuth 인증 URL 생성."""
+    """Instagram Direct Login OAuth URL 생성."""
     from urllib.parse import urlencode
     params = {
         "client_id": settings.instagram_app_id,
@@ -26,75 +26,58 @@ def get_auth_url(state: str = "") -> str:
         "scope": SCOPES,
         "response_type": "code",
         "state": state,
+        "enable_fb_login": "0",
+        "force_authentication": "1",
     }
-    return f"{META_AUTH_URL}?{urlencode(params)}"
+    return f"{IG_AUTH_URL}?{urlencode(params)}"
 
 
 async def exchange_code(code: str) -> dict:
-    """인증 코드 → 단기 토큰 → 장기 토큰 교환."""
+    """인증 코드 → 단기 토큰 → 장기 토큰 교환 (Instagram Direct Login)."""
     async with httpx.AsyncClient() as client:
-        # 단기 토큰
-        resp = await client.get(META_TOKEN_URL, params={
+        # 단기 토큰 (POST)
+        resp = await client.post(IG_TOKEN_URL, data={
             "client_id": settings.instagram_app_id,
             "client_secret": settings.instagram_app_secret,
+            "grant_type": "authorization_code",
             "redirect_uri": settings.instagram_redirect_uri,
             "code": code,
         })
         resp.raise_for_status()
-        short_token = resp.json()["access_token"]
+        short_data = resp.json()
+        short_token = short_data["access_token"]
+        user_id = str(short_data.get("user_id", ""))
 
         # 장기 토큰 교환
-        resp2 = await client.get(f"{GRAPH_API}/oauth/access_token", params={
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.instagram_app_id,
+        resp2 = await client.get(f"{GRAPH_API}/access_token", params={
+            "grant_type": "ig_exchange_token",
             "client_secret": settings.instagram_app_secret,
-            "fb_exchange_token": short_token,
+            "access_token": short_token,
         })
         resp2.raise_for_status()
         data = resp2.json()
         return {
             "access_token": data["access_token"],
+            "user_id": user_id,
             "expires_in": data.get("expires_in", 5184000),  # ~60일
         }
 
 
-async def get_ig_account(access_token: str) -> dict:
-    """Facebook 페이지에 연결된 Instagram 비즈니스 계정 조회."""
+async def get_ig_account(access_token: str, user_id: str = "") -> dict:
+    """Instagram Direct Login으로 인증된 계정 정보 조회."""
     async with httpx.AsyncClient() as client:
-        # 내 페이지 목록
-        resp = await client.get(f"{GRAPH_API}/me/accounts", params={
+        resp = await client.get(f"{GRAPH_API}/me", params={
+            "fields": "user_id,username",
             "access_token": access_token,
         })
         resp.raise_for_status()
-        pages = resp.json().get("data", [])
-        if not pages:
-            raise ValueError("연결된 Facebook 페이지가 없습니다")
-
-        # 첫 페이지의 IG 계정
-        page = pages[0]
-        page_token = page["access_token"]
-        resp2 = await client.get(f"{GRAPH_API}/{page['id']}", params={
-            "fields": "instagram_business_account",
-            "access_token": page_token,
-        })
-        resp2.raise_for_status()
-        ig_data = resp2.json().get("instagram_business_account")
-        if not ig_data:
-            raise ValueError("Instagram 비즈니스 계정이 연결되지 않았습니다")
-
-        ig_id = ig_data["id"]
-        # IG 계정 이름 조회
-        resp3 = await client.get(f"{GRAPH_API}/{ig_id}", params={
-            "fields": "username",
-            "access_token": access_token,
-        })
-        resp3.raise_for_status()
-        username = resp3.json().get("username", ig_id)
+        data = resp.json()
+        ig_id = str(data.get("user_id", user_id))
+        username = data.get("username", ig_id)
 
         return {
             "ig_user_id": ig_id,
             "username": username,
-            "page_access_token": page_token,
         }
 
 
