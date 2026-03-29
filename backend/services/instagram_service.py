@@ -147,6 +147,7 @@ async def upload_reels(
             "video_url": video_url,
             "caption": caption,
             "share_to_feed": "true",
+            "is_made_with_ai": "true",
             "access_token": access_token,
         })
         if resp.status_code != 200:
