@@ -133,7 +133,7 @@ async def upload_video(
             json={
                 "post_info": {
                     "title": title[:150],
-                    "privacy_level": "SELF_ONLY",
+                    "privacy_level": "PUBLIC_TO_EVERYONE",
                     "disable_duet": False,
                     "disable_comment": False,
                     "disable_stitch": False,
