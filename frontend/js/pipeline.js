@@ -91,10 +91,13 @@ async function _loadUploadButtons(projectId) {
     // 이벤트 바인딩 — 재업로드 (업로드 완료된 플랫폼)
     container.querySelectorAll('.upload-reupload').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (confirm(`${btn.dataset.platform} 재업로드하시겠습니까? 기존 업로드 기록이 삭제됩니다.`)) {
-          _uploadToPlatform(btn.dataset.pid, btn.dataset.platform, true);
+        const url = btn.dataset.url;
+        const plat = btn.dataset.platform;
+        const choice = confirm(`${plat} 재업로드하시겠습니까?\n\n[확인] 재업로드\n[취소] 기존 게시물 열기\n\n현재 URL: ${url}`);
+        if (choice) {
+          _uploadToPlatform(btn.dataset.pid, plat, true);
         } else {
-          window.open(btn.dataset.url, '_blank');
+          window.open(url, '_blank');
         }
       });
     });

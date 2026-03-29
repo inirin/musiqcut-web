@@ -185,6 +185,14 @@ async def upload_reels(
             pub_resp.raise_for_status()
         media_id = pub_resp.json()["id"]
 
-    url = f"https://www.instagram.com/reel/{media_id}/"
+        # permalink 조회
+        try:
+            perm_resp = await client.get(f"{GRAPH_API}/{media_id}", params={
+                "fields": "permalink",
+                "access_token": access_token,
+            })
+            url = perm_resp.json().get("permalink", f"https://www.instagram.com/reel/{media_id}/")
+        except Exception:
+            url = f"https://www.instagram.com/reel/{media_id}/"
     print(f"[Instagram] 업로드 완료: {url}", file=sys.stderr)
     return {"video_id": media_id, "url": url}
