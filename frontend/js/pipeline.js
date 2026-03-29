@@ -469,8 +469,9 @@ function updateStepUI(step, status, message, data) {
   // STEP 2: 오디오 (running/done 모두)
   if (step === 2 && data?.audio_url) {
     const audio = document.getElementById('step-2-audio');
+    const audioUrl = data.audio_url + (data.audio_url.includes('?') ? '&' : '?') + 't=' + Date.now();
     if (audio && !audio.src.includes(data.audio_url.split('?')[0])) {
-      audio.src = data.audio_url; audio.classList.remove('hidden');
+      audio.src = audioUrl; audio.classList.remove('hidden');
     }
   }
   // STEP 2: Whisper 가사
@@ -863,7 +864,7 @@ async function _showLightboxItemInner() {
     } else if (!window._currentProjectId || endSec <= startSec) {
       if (audioRow) audioRow.style.display = 'none';
     } else {
-      const audioSrc = `/storage/projects/${window._currentProjectId}/music/output.mp3`;
+      const audioSrc = `/storage/projects/${window._currentProjectId}/music/output.mp3?t=${Date.now()}`;
 
       audioEl.src = audioSrc;
       audioEl.currentTime = startSec;
