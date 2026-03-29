@@ -134,7 +134,7 @@ async def run_all():
                     if sg.get("words"):
                         original_words.extend(sg["words"])
                 # SequenceMatcher로 원본↔보정 정렬, 타이밍 보존
-                _apply_corrected_words(timed_lines, original_words, corrected_words)
+                _apply_corrected_words(timed_lines, original_words, corrected_words, story_text=lyrics_text)
                 _trim_short_tail_words(timed_lines)
                 # 세그먼트 text를 words에서 재구성
                 for sg in timed_lines:

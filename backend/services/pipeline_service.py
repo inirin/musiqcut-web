@@ -203,7 +203,7 @@ async def _merge_audio_to_clip(clip_path: str, audio_path: str,
         raise RuntimeError(result.stderr[-200:])
 
 
-def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.15):
+def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.3):
     """마지막 보컬 세그먼트 끝에서 타이밍이 극히 짧은 단어 연속 제거.
     Gemini 보정으로 삽입된 단어가 짧은 시간에 몰린 경우 오보정으로 판단."""
     import sys
@@ -226,7 +226,8 @@ def _trim_short_tail_words(timed_lines: list, min_dur: float = 0.15):
         break
 
 
-def _apply_corrected_words(timed_lines: list, original_words: list, corrected_words: list):
+def _apply_corrected_words(timed_lines: list, original_words: list, corrected_words: list,
+                           story_text: str = ""):
     """보정된 단어를 원본 타이밍에 매핑. SequenceMatcher로 정렬하여 타이밍 보존."""
     from difflib import SequenceMatcher
 
@@ -279,9 +280,16 @@ def _apply_corrected_words(timed_lines: list, original_words: list, corrected_wo
                     "end": round(t_start + (k + 1) * step, 3),
                 })
         elif op == "delete":
-            # 삭제 → 원본 단어 유지 (Gemini가 빼도 보존)
+            # 삭제: 원문에 있는 단어는 보존, 원문에 없는 단어(환각)는 삭제 허용
+            import re as _re2
+            _lyrics_set = set(_re2.sub(r'[.,!?;:~…\"\'\-\[\]]+', '', story_text).lower().split()) if story_text else set()
             for oi in range(i1, i2):
-                new_words_flat.append(original_words[oi].copy())
+                w = original_words[oi]
+                if w["text"].lower() in _lyrics_set:
+                    new_words_flat.append(w.copy())
+                else:
+                    print(f"[LyricsSync] 환각 단어 삭제 허용: '{w['text']}'",
+                          file=sys.stderr)
 
     # 평탄화된 words를 세그먼트에 재배분 (시간 기준)
     for sg in timed_lines:
@@ -589,7 +597,7 @@ async def _run_pipeline_steps(
                         if sg.get("words"):
                             original_words.extend(sg["words"])
                     # SequenceMatcher로 원본↔보정 정렬, 타이밍 보존
-                    _apply_corrected_words(timed_lines, original_words, corrected_words)
+                    _apply_corrected_words(timed_lines, original_words, corrected_words, story_text=lyrics)
                     # 끝부분 짧은 타이밍 단어 제거 (Gemini 오보정 후처리)
                     _trim_short_tail_words(timed_lines)
                     # 세그먼트 text도 words에서 재구성
