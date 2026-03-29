@@ -762,7 +762,7 @@ async function _showLightboxItemInner() {
   if (audioEl) { audioEl.pause(); audioEl.removeAttribute('src'); }
   if (infoEl) { infoEl.classList.add('hidden'); lyricsEl.innerHTML = ''; }
 
-  const bust = url.includes('?') ? '' : `?t=${Date.now()}`;
+  const bust = url.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
   const curMeta = _lbMeta ? _lbMeta[_lbIndex] : null;
   const isImage = _lbType === 'image' || (!url.endsWith('.mp4') && !curMeta?.status);
   const clipStatus = isImage ? 'done' : (curMeta?.status || (url.endsWith('.mp4') ? 'done' : 'pending'));
