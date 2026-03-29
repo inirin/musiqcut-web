@@ -914,11 +914,20 @@ async def _run_pipeline_steps(
                         abort_check=lambda: emitter._abort)
                     clip_files[idx] = result
                 except Exception as e:
-                    print(f"[STEP4] S2V 실패 (장면 {sno}), 폴백: {e}", file=sys.stderr)
-                    from backend.services.wan_video_service import _ffmpeg_still_video
-                    still_out = clip_path(project_id, sno)
-                    await _ffmpeg_still_video(image_files[idx], still_out, duration=scene_dur)
-                    clip_files[idx] = str(still_out)
+                    print(f"[STEP4] S2V 실패 (장면 {sno}), I2V로 폴백: {e}", file=sys.stderr)
+                    try:
+                        await _free_comfyui_vram()
+                        wan_result = await wan_generate_clips(
+                            project_id, [scene], [image_files[idx]],
+                            abort_check=lambda: emitter._abort)
+                        clip_files[idx] = wan_result[0]
+                        print(f"[STEP4] I2V 폴백 성공 (장면 {sno})", file=sys.stderr)
+                    except Exception as e2:
+                        print(f"[STEP4] I2V 폴백도 실패 (장면 {sno}), 정지 이미지: {e2}", file=sys.stderr)
+                        from backend.services.wan_video_service import _ffmpeg_still_video
+                        still_out = clip_path(project_id, sno)
+                        await _ffmpeg_still_video(image_files[idx], still_out, duration=scene_dur)
+                        clip_files[idx] = str(still_out)
 
             async def _generate_i2v_clip(idx, scene):
                 """I2V 모션 클립 단건 생성 (폴백 포함)."""
