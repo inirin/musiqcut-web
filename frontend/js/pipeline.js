@@ -119,13 +119,13 @@ async function _uploadToPlatform(projectId, platform) {
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
             toast(`${label} 업로드 완료!`, 'success');
-            sendNotification(`${label} 업로드 완료`, '영상이 업로드되었습니다.');
+            sendNotification(`${label} 업로드 완료`, _pipelineTitle || '영상이 업로드되었습니다.');
           } else if (u && u.status === 'failed') {
             clearInterval(pollUpload);
             _uploadingPlatforms.delete(platform);
             _loadUploadButtons(projectId);
             toast(`${label} 업로드 실패`, 'error');
-            sendNotification(`${label} 업로드 실패`, '업로드 중 오류가 발생했습니다.');
+            sendNotification(`${label} 업로드 실패`, _pipelineTitle || '업로드 중 오류가 발생했습니다.');
           }
         } catch {}
       }, 3000);
@@ -345,6 +345,7 @@ async function startPipeline(theme, mood) {
 }
 
 let _pipelineProjectId = null;
+let _pipelineTitle = '';
 
 function handlePipelineEvent(evt) {
   if (evt.type === 'ping' || evt.type === 'info') return;
@@ -359,12 +360,12 @@ function handlePipelineEvent(evt) {
     updateStepUI(evt.step, evt.status, evt.message, d);
     // Step 1 시작 알림
     if (evt.status === 'running' && evt.step === 1) {
-      sendNotification('작품 생성 시작', evt.message || '새 작품을 생성합니다.');
+      sendNotification('작품 생성 시작', _pipelineTitle || '새 작품을 생성합니다.');
     }
     if (evt.status === 'running' && evt.step === 4) startResourceMonitor(evt.step);
     if (evt.status === 'done' && evt.step === 4) {
       stopResourceMonitor();
-      sendNotification('클립 생성 완료', '영상 클립이 모두 생성되었습니다.');
+      sendNotification('클립 생성 완료', _pipelineTitle || '영상 클립이 모두 생성되었습니다.');
     }
   }
 
@@ -375,7 +376,7 @@ function handlePipelineEvent(evt) {
     stopResourceMonitor();
     _updateAbortButton(false);
     toast('뮤직비디오 완성!', 'success');
-    sendNotification('영상 완성!', '뮤직비디오가 생성되었습니다.', () => {
+    sendNotification('영상 완성!', _pipelineTitle || '뮤직비디오가 생성되었습니다.', () => {
       showPage('result');
     });
     // 영상 카드 표시
@@ -416,7 +417,7 @@ function handlePipelineEvent(evt) {
     document.getElementById('result-status').innerHTML = statusBadge('failed');
     toast(`오류: ${evt.message}`, 'error');
     if (evt.step > 0) {
-      sendNotification('작업 실패', `STEP ${evt.step}에서 오류가 발생했습니다.`);
+      sendNotification('작업 실패', `${_pipelineTitle ? _pipelineTitle + ' — ' : ''}STEP ${evt.step} 오류`);
     }
   }
 }
@@ -479,6 +480,7 @@ function updateStepUI(step, status, message, data) {
   }
 
   // STEP 1: 스토리 (done 시)
+  if (step === 1 && data?.title) _pipelineTitle = data.title;
   if (step === 1 && data?.lyrics) {
     const lyricsEl = document.getElementById('step-1-lyrics');
     if (lyricsEl) { lyricsEl.textContent = data.lyrics; lyricsEl.classList.remove('hidden'); }
