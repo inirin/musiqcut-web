@@ -1042,9 +1042,8 @@ async def _run_pipeline_steps(
         await _update_project(project_id, status="done", video_path=final_video)
 
         await emitter.update(5, "done", "영상 합성 완료!")
-        await emitter.complete(final_video)
 
-        # 자동 업로드 (source='auto' 작품만)
+        # 자동 업로드 (source='auto' 작품만, emitter.complete 전에 실행)
         try:
             from backend.services.upload_service import auto_upload_if_configured
             async with aiosqlite.connect(DB_PATH) as _db:
@@ -1055,6 +1054,8 @@ async def _run_pipeline_steps(
                     await auto_upload_if_configured(project_id)
         except Exception as _e:
             print(f"[Pipeline] 자동 업로드 스킵: {_e}", file=sys.stderr)
+
+        await emitter.complete(final_video)
 
     except (_PipelineAbortError, _ComfyAbortError, _ImageAbortError):
         # 중단 요청 — 프로젝트 + 현재 스텝을 failed로 마킹
