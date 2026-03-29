@@ -17,7 +17,7 @@ async def run_all():
     from backend.utils.file_manager import (
         lyrics_path, music_path, clip_path, lipsync_clip_path,
     )
-    from backend.services.pipeline_service import _correct_lyrics_with_gemini, _apply_corrected_words
+    from backend.services.pipeline_service import _correct_lyrics_with_gemini, _apply_corrected_words, _trim_short_tail_words
     from backend.services.ffmpeg_service import render_video
 
     model = WhisperModel("large-v3", device="cpu", compute_type="int8")
@@ -135,6 +135,7 @@ async def run_all():
                         original_words.extend(sg["words"])
                 # SequenceMatcher로 원본↔보정 정렬, 타이밍 보존
                 _apply_corrected_words(timed_lines, original_words, corrected_words)
+                _trim_short_tail_words(timed_lines)
                 # 세그먼트 text를 words에서 재구성
                 for sg in timed_lines:
                     words = sg.get("words", [])

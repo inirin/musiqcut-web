@@ -186,11 +186,15 @@ def _generate_ass(scenes: list, out_path: Path,
     )
 
     style_names = ["Top", "Bottom"]
+    # 첫 프레임(1/24fps ≈ 0.042초)은 썸네일용 → 가사 숨김
+    FIRST_FRAME = round(1.0 / TARGET_FPS, 3)
     dialogues = []
     for si in range(2):
         for start, end, text, fade in slot_segs[si]:
             if end <= start:
                 continue
+            if start < FIRST_FRAME:
+                start = FIRST_FRAME
             s_str = _sec_to_ass(start)
             e_str = _sec_to_ass(end)
             prefix = f"{{\\fad(0,{FADE_OUT_MS})}}" if fade else ""
