@@ -125,6 +125,26 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
                 "from_step": from_step, "deleted": deleted,
                 "queued": True}
 
+    # DB 클립 슬롯을 pending으로 업데이트 (프론트 표시용)
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            row = await (await db.execute(
+                "SELECT output_data FROM pipeline_steps WHERE project_id=? AND step_no=4 ORDER BY id DESC LIMIT 1",
+                (project_id,))).fetchone()
+            if row and row[0]:
+                data = json.loads(row[0])
+                slots = data.get("clip_slots", [])
+                idx = scene_no - 1
+                if 0 <= idx < len(slots):
+                    slots[idx]["status"] = "pending"
+                    slots[idx].pop("url", None)
+                    await db.execute(
+                        "UPDATE pipeline_steps SET output_data=? WHERE project_id=? AND step_no=4 AND id=(SELECT MAX(id) FROM pipeline_steps WHERE project_id=? AND step_no=4)",
+                        (json.dumps(data, ensure_ascii=False), project_id, project_id))
+                    await db.commit()
+    except Exception:
+        pass
+
     # 비디오도 삭제 (Step 5 재합성 필요)
     video_dir = Path(f"storage/projects/{project_id}/video")
     if video_dir.exists():
