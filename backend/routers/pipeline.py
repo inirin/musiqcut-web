@@ -13,6 +13,38 @@ from backend.services.pipeline_service import run_pipeline
 
 router = APIRouter()
 
+
+async def _notify_slot_pending(project_id: str, emitter: ProgressEmitter,
+                               step_no: int, scene_no: int):
+    """재생성 시 DB 슬롯을 pending으로 업데이트 + WebSocket 알림."""
+    slot_key = "clip_slots" if step_no == 4 else "images"
+    step_label = "클립" if step_no == 4 else "이미지"
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            row = await (await db.execute(
+                "SELECT output_data FROM pipeline_steps "
+                "WHERE project_id=? AND step_no=? ORDER BY id DESC LIMIT 1",
+                (project_id, step_no)
+            )).fetchone()
+            if row and row[0]:
+                data = json.loads(row[0])
+                slots = data.get(slot_key, [])
+                idx = scene_no - 1
+                if 0 <= idx < len(slots):
+                    slots[idx]["status"] = "pending"
+                    slots[idx].pop("url", None)
+                    await db.execute(
+                        "UPDATE pipeline_steps SET output_data=? "
+                        "WHERE project_id=? AND step_no=? AND id=(SELECT MAX(id) FROM pipeline_steps WHERE project_id=? AND step_no=?)",
+                        (json.dumps(data, ensure_ascii=False), project_id, step_no, project_id, step_no))
+                    await db.commit()
+                # emitter에 변경 알림
+                await emitter.update(step_no, "running",
+                    f"{step_label} 재생성 대기 중... (장면 {scene_no})", data)
+    except Exception as e:
+        print(f"[Regen] Step {step_no} 슬롯 업데이트 실패: {e}",
+              file=__import__('sys').stderr)
+
 # 동시 실행 방지 — API rate limit / SQLite 동시 쓰기 보호
 _pipeline_lock = asyncio.Lock()
 _running_project_id: str | None = None
@@ -80,46 +112,12 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
     # (루프가 해당 장면에 도달하면 파일 없으니 자동 재생성)
     existing_emitter = get_emitter(project_id)
     if _pipeline_lock.locked() and existing_emitter and not existing_emitter.done:
-        # DB의 clip_slots에서 해당 슬롯을 pending으로 업데이트
-        try:
-            async with aiosqlite.connect(DB_PATH) as db:
-                import json as _json
-                row = await (await db.execute(
-                    "SELECT output_data FROM pipeline_steps "
-                    "WHERE project_id=? AND step_no=4 AND status='running' "
-                    "ORDER BY id DESC LIMIT 1", (project_id,)
-                )).fetchone()
-                if row and row[0]:
-                    data = _json.loads(row[0])
-                    slots = data.get("clip_slots", [])
-                    idx = scene_no - 1
-                    if 0 <= idx < len(slots):
-                        slots[idx]["status"] = "pending"
-                        slots[idx].pop("url", None)
-                        await db.execute(
-                            "UPDATE pipeline_steps SET output_data=? "
-                            "WHERE project_id=? AND step_no=4 AND status='running'",
-                            (_json.dumps(data, ensure_ascii=False), project_id))
-                        await db.commit()
-        except Exception as e:
-            print(f"[Regen] DB 슬롯 업데이트 실패: {e}", file=__import__('sys').stderr)
-
-        # emitter에 클립 슬롯 변경 알림 (WebSocket 클라이언트 실시간 반영)
-        try:
-            async with aiosqlite.connect(DB_PATH) as db:
-                row2 = await (await db.execute(
-                    "SELECT output_data FROM pipeline_steps "
-                    "WHERE project_id=? AND step_no=4 ORDER BY id DESC LIMIT 1",
-                    (project_id,)
-                )).fetchone()
-                if row2 and row2[0]:
-                    import json as _json2
-                    step4_data = _json2.loads(row2[0])
-                    await existing_emitter.update(4, "running",
-                        f"클립 재생성 대기 중... (장면 {scene_no})",
-                        step4_data)
-        except Exception:
-            pass
+        # 재생성 대상 스텝의 DB 슬롯 + WebSocket 알림
+        regen_steps = [4]
+        if include_image:
+            regen_steps = [3, 4]
+        for step_no in regen_steps:
+            await _notify_slot_pending(project_id, existing_emitter, step_no, scene_no)
 
         print(f"[Regen] 파이프라인 실행 중 — 파일만 삭제, 루프에서 자동 재생성 예정",
               file=__import__('sys').stderr)
