@@ -13,8 +13,6 @@ from backend.database import DB_PATH
 IG_AUTH_URL = "https://api.instagram.com/oauth/authorize"
 IG_TOKEN_URL = "https://api.instagram.com/oauth/access_token"
 GRAPH_API = "https://graph.instagram.com"
-# 콘텐츠 퍼블리싱은 graph.facebook.com 사용
-PUBLISH_API = "https://graph.facebook.com/v22.0"
 
 SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages"
 
@@ -129,50 +127,39 @@ async def upload_reels(
     video_path: str,
     caption: str,
 ) -> dict:
-    """Instagram Reels 업로드 (resumable upload)."""
-    file_path = Path(video_path)
-    file_size = file_path.stat().st_size
+    """Instagram Reels 업로드 (video_url 방식)."""
+    # 공개 URL 생성 (Cloudflare Tunnel 경유)
+    from pathlib import PurePosixPath
+    rel_path = PurePosixPath(video_path.replace("\\", "/"))
+    video_url = f"https://musiqcut.com/{rel_path}"
 
     async with httpx.AsyncClient(timeout=300) as client:
-        # 1) Resumable 컨테이너 생성
-        resp = await client.post(f"{PUBLISH_API}/{ig_user_id}/media", data={
+        # 1) 미디어 컨테이너 생성 (video_url 방식)
+        resp = await client.post(f"{GRAPH_API}/{ig_user_id}/media", data={
             "media_type": "REELS",
-            "upload_type": "resumable",
+            "video_url": video_url,
             "caption": caption,
             "share_to_feed": "true",
             "is_made_with_ai": "true",
             "access_token": access_token,
         })
-        resp.raise_for_status()
-        data = resp.json()
-        creation_id = data["id"]
-        upload_uri = data.get("uri")
+        if resp.status_code != 200:
+            print(f"[Instagram] 컨테이너 생성 실패: {resp.status_code} {resp.text}", file=sys.stderr)
+            resp.raise_for_status()
+        creation_id = resp.json()["id"]
+        print(f"[Instagram] 컨테이너 생성: {creation_id}, video_url: {video_url}", file=sys.stderr)
 
-        if not upload_uri:
-            raise RuntimeError(f"업로드 URI를 받지 못했습니다: {data}")
-
-        # 2) 영상 바이너리 업로드
-        with open(file_path, "rb") as f:
-            video_data = f.read()
-
-        upload_resp = await client.post(upload_uri, headers={
-            "Authorization": f"OAuth {access_token}",
-            "Content-Type": "application/octet-stream",
-            "offset": "0",
-            "file_size": str(file_size),
-        }, content=video_data)
-        upload_resp.raise_for_status()
-
-        # 3) 처리 상태 폴링
+        # 2) 처리 상태 폴링
         for _ in range(60):  # 최대 5분
             await asyncio.sleep(5)
-            status_resp = await client.get(f"{PUBLISH_API}/{creation_id}", params={
+            status_resp = await client.get(f"{GRAPH_API}/{creation_id}", params={
                 "fields": "status_code,status",
                 "access_token": access_token,
             })
             status_resp.raise_for_status()
             status = status_resp.json()
             code = status.get("status_code")
+            print(f"[Instagram] 처리 상태: {code}", file=sys.stderr)
             if code == "FINISHED":
                 break
             elif code == "ERROR":
@@ -180,12 +167,14 @@ async def upload_reels(
         else:
             raise RuntimeError("Instagram 처리 시간 초과")
 
-        # 4) 퍼블리시
-        pub_resp = await client.post(f"{PUBLISH_API}/{ig_user_id}/media_publish", data={
+        # 3) 퍼블리시
+        pub_resp = await client.post(f"{GRAPH_API}/{ig_user_id}/media_publish", data={
             "creation_id": creation_id,
             "access_token": access_token,
         })
-        pub_resp.raise_for_status()
+        if pub_resp.status_code != 200:
+            print(f"[Instagram] 퍼블리시 실패: {pub_resp.status_code} {pub_resp.text}", file=sys.stderr)
+            pub_resp.raise_for_status()
         media_id = pub_resp.json()["id"]
 
     url = f"https://www.instagram.com/reel/{media_id}/"
