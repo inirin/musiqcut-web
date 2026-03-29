@@ -60,8 +60,10 @@ venv/Scripts/python.exe auto_generate.py
 
 ### Lyrics & Subtitle System
 - **Whisper 전사**: 원본 mp3 직접 사용 (demucs 미사용), condition_on_previous_text fallback (False→True)
-- **환각 방지 3중 방어**: ① 마지막 세그먼트 원문 겹침 0% 제거 ② SequenceMatcher 맨 끝 insert 차단 ③ 끝부분 0.3초 미만 연속 단어 트림
-- **Gemini 보정**: 전체 단어 단위 (줄 무관), SequenceMatcher 타이밍 보존, 보컬라이즈 보존, delete 시 원문에 없는 단어만 삭제 허용
+- **환각 방지 2중 방어**: ① 마지막 세그먼트 원문 겹침 0% 제거 ② 끝부분 0.3초 미만 연속 단어 트림 (Gemini 오보정 제거)
+- **Gemini 보정**: 전체 단어 단위 (줄 무관), SequenceMatcher 타이밍 보존, 보컬라이즈 보존, delete 시 원문에 없는 단어만 삭제 허용, 맨 끝 insert 허용 (트림이 환각 방어)
+- **Step 4 구 클립 방지**: 이미지보다 오래된 클립 자동 삭제 (이미지 재생성 후 잔존 방지)
+- **재생성 WebSocket 알림**: Step 3/4 재생성 시 emitter로 실시간 슬롯 상태 전송
 - **트리밍 → 보정 순서**: scene_count 맞추기 후 Gemini 보정 (잘린 가사 복원 방지)
 - **보컬 감지 기준**: 인식 단어 수 < 원문 30% 미만이면 실패 → Step 1 재시도
 - **자막 ASS**: 카페24 단정해(40px), 2줄 교대, 3단어/줄, 무음 갭 fade-out
