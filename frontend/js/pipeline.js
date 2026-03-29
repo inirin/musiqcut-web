@@ -363,9 +363,10 @@ function handlePipelineEvent(evt) {
       sendNotification('작품 생성 시작', _pipelineTitle || '새 작품을 생성합니다.');
     }
     if (evt.status === 'running' && evt.step === 4) startResourceMonitor(evt.step);
-    if (evt.status === 'done' && evt.step === 4) {
-      stopResourceMonitor();
-      sendNotification('클립 생성 완료', _pipelineTitle || '영상 클립이 모두 생성되었습니다.');
+    if (evt.status === 'done' && evt.step === 4) stopResourceMonitor();
+    // 클립 재생성 완료 알림 (재생성 대기 중이던 클립이 done이 됐을 때)
+    if (evt.step === 4 && d?.clip_slots && evt.message?.includes('재생성')) {
+      sendNotification('클립 재생성 완료', _pipelineTitle || '클립이 재생성되었습니다.');
     }
   }
 
