@@ -563,7 +563,7 @@ async def _run_pipeline_steps(
                 vocal_count = sum(1 for sg in timed_lines if sg.get("has_vocal"))
                 total_words = sum(len(sg.get("words", [])) for sg in timed_lines)
                 expected_words = len(lyrics.replace("[End]", "").split())
-                if vocal_count == 0 or (expected_words > 0 and total_words < expected_words * 0.5):
+                if vocal_count == 0 or (expected_words > 0 and total_words < expected_words * 0.3):
                     print(f"[STEP2] 보컬 감지 실패: {total_words}단어/{expected_words}예상",
                           file=sys.stderr)
                     raise _VocalDetectionError()
