@@ -234,19 +234,17 @@ def _apply_corrected_words(timed_lines: list, original_words: list, corrected_wo
                     "end": round(t_start + (k + 1) * step, 3),
                 })
         elif op == "insert":
-            # 삽입 → 이전 단어와 다음 단어 사이 시간에 배분
+            # 맨 끝 삽입은 차단 (환각 방지), 중간 삽입만 허용
+            if i1 >= len(original_words):
+                print(f"[LyricsSync] 맨 끝 삽입 차단: {corrected_words[j1:j2]}",
+                      file=sys.stderr)
+                continue
+            # 중간 삽입 → 이전 단어와 다음 단어 사이 시간에 배분
             if new_words_flat:
                 t_start = new_words_flat[-1]["end"]
-            elif i1 < len(original_words):
+            else:
                 t_start = original_words[i1]["start"]
-            else:
-                t_start = 0.0
-            if i1 < len(original_words):
-                t_end = original_words[i1]["start"]
-            elif new_words_flat:
-                t_end = t_start + 0.5
-            else:
-                t_end = t_start + 0.5
+            t_end = original_words[i1]["start"]
             if t_end <= t_start:
                 t_end = t_start + 0.3
             n = j2 - j1
@@ -258,8 +256,9 @@ def _apply_corrected_words(timed_lines: list, original_words: list, corrected_wo
                     "end": round(t_start + (k + 1) * step, 3),
                 })
         elif op == "delete":
-            # 삭제 → 원본 단어 스킵 (Gemini가 제거한 것)
-            pass
+            # 삭제 → 원본 단어 유지 (Gemini가 빼도 보존)
+            for oi in range(i1, i2):
+                new_words_flat.append(original_words[oi].copy())
 
     # 평탄화된 words를 세그먼트에 재배분 (시간 기준)
     for sg in timed_lines:
@@ -579,7 +578,7 @@ async def _run_pipeline_steps(
                         if si < len(timed_lines) and timed_lines[si]["text"].strip():
                             sc_d["vocal_lines"] = [timed_lines[si]["text"]]
                     _write_lyrics(project_id, script_tmp)
-                    print(f"[LyricsSync] Gemini 가사 보정 완료 ({ci}줄)", file=sys.stderr)
+                    print(f"[LyricsSync] Gemini 가사 보정 완료 ({len(corrected_words)}단어)", file=sys.stderr)
                 except Exception as e:
                     print(f"[LyricsSync] Gemini 보정 실패 (원본 사용): {e}", file=sys.stderr)
             for sg in timed_lines:
