@@ -426,8 +426,8 @@ async def disconnect_tiktok():
 # ── 플랫폼별 업로드 ─────────────────────────────
 
 @router.post("/{project_id}/upload/{platform}")
-async def upload_to_platform(project_id: str, platform: str):
-    """특정 플랫폼에 업로드."""
+async def upload_to_platform(project_id: str, platform: str, reupload: bool = False):
+    """특정 플랫폼에 업로드. reupload=true면 기존 기록 삭제 후 재업로드."""
     if platform not in ("youtube", "instagram", "tiktok"):
         return {"ok": False, "error": f"지원하지 않는 플랫폼: {platform}"}
 
@@ -436,10 +436,10 @@ async def upload_to_platform(project_id: str, platform: str):
         return {"ok": False, "error": f"{platform} 계정이 연결되지 않았습니다"}
 
     async def _run():
-        await upload_service.create_and_execute_upload(project_id, platform)
+        await upload_service.create_and_execute_upload(project_id, platform, reupload=reupload)
 
     asyncio.create_task(_run())
-    return {"ok": True, "message": f"{platform} 업로드를 시작합니다"}
+    return {"ok": True, "message": f"{platform} {'재' if reupload else ''}업로드를 시작합니다"}
 
 
 # ── 전체 플랫폼 업로드 ──────────────────────────

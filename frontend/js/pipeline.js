@@ -64,7 +64,7 @@ async function _loadUploadButtons(projectId) {
       } else if (_uploadingPlatforms.has(p.key)) {
         html += `<button type="button" class="btn btn-secondary" disabled>${p.label}<br>⏳ 업로드 중</button>`;
       } else if (u && u.status === 'done') {
-        html += `<a href="${u.platform_url}" target="_blank" rel="noopener" class="btn btn-secondary">✅ ${p.label}<br>업로드됨</a>`;
+        html += `<button type="button" class="btn btn-secondary upload-reupload" data-pid="${projectId}" data-platform="${p.key}" data-url="${u.platform_url}">✅ ${p.label}<br>업로드됨</button>`;
       } else if (u && u.status === 'uploading') {
         html += `<button type="button" class="btn btn-secondary" disabled>${p.label}<br>⏳ 업로드 중</button>`;
       } else if (u && u.status === 'failed') {
@@ -88,6 +88,16 @@ async function _loadUploadButtons(projectId) {
     container.querySelectorAll('.upload-action').forEach(btn => {
       btn.addEventListener('click', () => _uploadToPlatform(btn.dataset.pid, btn.dataset.platform));
     });
+    // 이벤트 바인딩 — 재업로드 (업로드 완료된 플랫폼)
+    container.querySelectorAll('.upload-reupload').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (confirm(`${btn.dataset.platform} 재업로드하시겠습니까? 기존 업로드 기록이 삭제됩니다.`)) {
+          _uploadToPlatform(btn.dataset.pid, btn.dataset.platform, true);
+        } else {
+          window.open(btn.dataset.url, '_blank');
+        }
+      });
+    });
   } catch (e) {
     console.error('_loadUploadButtons error:', e);
     container.innerHTML = '';
@@ -96,16 +106,17 @@ async function _loadUploadButtons(projectId) {
 
 let _uploadingPlatforms = new Set();
 
-async function _uploadToPlatform(projectId, platform) {
+async function _uploadToPlatform(projectId, platform, reupload = false) {
   if (_uploadingPlatforms.has(platform)) return;
   const label = _PLATFORMS.find(p => p.key === platform)?.label || platform;
-  if (!confirm(`${label}에 이 작품을 업로드하시겠습니까?`)) return;
+  if (!reupload && !confirm(`${label}에 이 작품을 업로드하시겠습니까?`)) return;
 
   _uploadingPlatforms.add(platform);
   _loadUploadButtons(projectId);
 
   try {
-    const res = await fetch(`/api/upload/${projectId}/upload/${platform}`, { method: 'POST' });
+    const reuploadParam = reupload ? '?reupload=true' : '';
+    const res = await fetch(`/api/upload/${projectId}/upload/${platform}${reuploadParam}`, { method: 'POST' });
     const data = await res.json();
     if (data.ok) {
       toast(`${label} 업로드를 시작합니다`, 'success');

@@ -83,6 +83,7 @@ async def create_and_execute_upload(
     project_id: str,
     platform: str = "youtube",
     custom_title: str = None,
+    reupload: bool = False,
 ) -> dict:
     """업로드 생성 + 실행."""
     from backend.services import youtube_service, instagram_service, tiktok_service
@@ -105,14 +106,19 @@ async def create_and_execute_upload(
         if not project["video_path"]:
             return {"ok": False, "error": "영상 파일이 없습니다"}
 
-    # 이미 업로드된 건 확인
+    # 이미 업로드된 건 확인 (재업로드 시 기존 기록 삭제)
     async with aiosqlite.connect(DB_PATH) as db:
         existing = await (await db.execute(
             "SELECT id FROM uploads WHERE project_id=? AND platform=? AND status='done'",
             (project_id, platform)
         )).fetchone()
         if existing:
-            return {"ok": False, "error": f"이미 {platform}에 업로드된 작품입니다"}
+            if reupload:
+                await db.execute("DELETE FROM uploads WHERE id=?", (existing[0],))
+                await db.commit()
+                print(f"[Upload] 재업로드: 기존 {platform} 기록 삭제", file=sys.stderr)
+            else:
+                return {"ok": False, "error": f"이미 {platform}에 업로드된 작품입니다"}
 
     # 메타데이터 생성
     meta = generate_metadata(project["title"], project["theme"], project_id)
