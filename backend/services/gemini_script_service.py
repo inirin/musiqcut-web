@@ -105,8 +105,8 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 - music_prompt에도 영문으로 보컬 특성을 포함 — 반드시 vocal_style과 일관되게
 
 제목 작성 규칙:
-- **음악 은유 금지**: "~의 멜로디/노래/하모니/왈츠" 등 음악 은유 제목 금지 (뮤지컬 프로젝트이므로 진부)
 - 제목 스타일은 자유롭게 — 직접적, 시적, 아이러니, 질문형, 대화체, 함축적 1단어 등 매번 다르게
+{recent_titles_block}
 
 출력 형식:
 {{
@@ -213,12 +213,31 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
     """STEP 1: 스토리/컨셉 + 작곡 지시 생성."""
     guide_fn = LENGTH_GUIDE.get(length, LENGTH_GUIDE["short"])
     guide = guide_fn() if callable(guide_fn) else guide_fn
+
+    # 최근 제목 가져와서 다양성 유도
+    recent_titles_block = ""
+    try:
+        import aiosqlite
+        from backend.database import DB_PATH
+        async with aiosqlite.connect(DB_PATH) as db:
+            rows = await db.execute_fetchall(
+                "SELECT title FROM projects ORDER BY created_at DESC LIMIT 15")
+            titles = [r[0] for r in rows if r[0]]
+            if titles:
+                recent_titles_block = (
+                    "- 최근 작품 제목: " + ", ".join(titles) + "\n"
+                    "- 위 제목들과 **어휘, 구조, 분위기가 겹치지 않는** 완전히 다른 스타일로 작성하세요"
+                )
+    except Exception:
+        pass
+
     prompt = STORY_PROMPT.format(
         theme=theme, mood=mood,
         duration_desc=guide["duration"],
         lyrics_lines_desc=guide["lyrics_lines"],
         structure_desc=guide["structure"],
         suno_hint=guide["suno_hint"],
+        recent_titles_block=recent_titles_block,
     )
     # 트렌드 힌트가 있으면 Google Search grounding으로 실존 인물/작품 검색
     if "[트렌드 힌트:" in mood:
