@@ -1,0 +1,27 @@
+{
+  "claim_generator": "MusiqCut/1.0",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.created",
+            "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+            "softwareAgent": "MusiqCut AI Pipeline"
+          }
+        ]
+      }
+    },
+    {
+      "label": "c2pa.creative_work",
+      "data": {
+        "author": [
+          {
+            "name": "MusiqCut AI"
+          }
+        ]
+      }
+    }
+  ]
+}
