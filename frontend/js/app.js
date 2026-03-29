@@ -296,7 +296,9 @@ function statusBadge(status) {
 
 // ── 브라우저 알림 ─────────────────────────────────
 function isNotificationEnabled() {
-  return localStorage.getItem('notif_enabled') !== 'false';
+  // 권한 요청한 적 없으면 비활성화 (기본 off)
+  if (!localStorage.getItem('notif_enabled')) return false;
+  return localStorage.getItem('notif_enabled') === 'true';
 }
 
 function sendNotification(title, body, onClick) {
