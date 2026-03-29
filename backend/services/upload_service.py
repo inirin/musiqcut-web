@@ -178,7 +178,9 @@ async def create_and_execute_upload(
 async def auto_upload_if_configured(project_id: str):
     """자동 생성 작품 완료 시 활성화된 플랫폼으로 자동 업로드."""
     print(f"[Upload] 자동 업로드 확인: {project_id[:8]}", file=sys.stderr)
+    import traceback as _tb
     for platform in ("youtube", "instagram", "tiktok"):
+        print(f"[Upload] 자동 업로드 루프: {platform}", file=sys.stderr)
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             config = await (await db.execute(
@@ -196,5 +198,8 @@ async def auto_upload_if_configured(project_id: str):
                 print(f"[Upload] {platform} 자동 업로드 결과: {result.get('ok')} {result.get('url', result.get('error', ''))}", file=sys.stderr)
             except Exception as e:
                 print(f"[Upload] {platform} 자동 업로드 에러: {e}", file=sys.stderr)
+                _tb.print_exc(file=sys.stderr)
             # 플랫폼 간 rate limit 방지
+            print(f"[Upload] {platform} 완료, 10초 대기...", file=sys.stderr)
             await asyncio.sleep(10)
+            print(f"[Upload] {platform} 대기 완료", file=sys.stderr)
