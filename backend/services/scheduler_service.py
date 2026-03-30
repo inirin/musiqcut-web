@@ -123,12 +123,12 @@ async def _generate_random_theme() -> tuple[str, str]:
         random.shuffle(trends)  # 순서 섞어서 상위 편중 방지
         trends_text = "\n".join(f"- {t}" for t in trends) if trends else "(조회 실패)"
 
-        # 기존 작품 테마를 가져와서 중복 방지
+        # 기존 작품 테마를 가져와서 중복 방지 (최근 30일)
         existing = []
         try:
             async with aiosqlite.connect(DB_PATH) as db:
                 rows = await db.execute_fetchall(
-                    "SELECT theme, mood FROM projects ORDER BY created_at DESC LIMIT 30")
+                    "SELECT theme, mood FROM projects WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC")
                 existing = [f"{r[0]} | {r[1]}" for r in rows]
         except Exception:
             pass
