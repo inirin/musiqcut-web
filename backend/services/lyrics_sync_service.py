@@ -54,12 +54,16 @@ async def extract_lyrics_timestamps(
                   f"세그먼트 시작 {vocal_start:.1f}초", file=sys.stderr)
 
     effective_duration = total_duration - vocal_start
-    # 부동소수점 오차 방지 (30.001초 → 7세그먼트 되는 문제)
+    # 남은 시간은 마지막 세그먼트에 합침 (22초 → 4클립: 5+5+5+7초)
     n_clips = max(1, round(effective_duration / clip_sec))
     segments = []
     for i in range(n_clips):
         s = round(vocal_start + i * clip_sec, 2)
-        e = round(min(vocal_start + (i + 1) * clip_sec, total_duration), 2)
+        # 마지막 세그먼트는 음원 끝까지 (남은 시간 합침 → 가변 길이 클립)
+        if i == n_clips - 1:
+            e = round(total_duration, 2)
+        else:
+            e = round(vocal_start + (i + 1) * clip_sec, 2)
         # 단어의 시작점이 이 세그먼트에 속하면 포함
         words_in = [w for w in all_words
                     if s <= w["start"] < e]
