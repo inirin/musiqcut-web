@@ -206,10 +206,11 @@ async function regenScene(includeImage) {
   const result = await API.post(`/pipeline/${id}/regenerate-scene/${sceneNo}?include_image=${includeImage}`, {});
   if (result.ok && result.queued) {
     // 파이프라인 실행 중 — 파일만 삭제됨, 해당 슬롯을 대기중으로 업데이트
+    const idx = sceneNo - 1;
+    // Step 4 클립 슬롯
     const clipContainer = document.getElementById('clip-previews');
     if (clipContainer) {
       const slots = clipContainer.querySelectorAll('.clip-slot, .scene-thumb');
-      const idx = sceneNo - 1;
       if (slots[idx]) {
         const imgUrl = slots[idx].querySelector('img')?.src || slots[idx].querySelector('video')?.poster || '';
         const badge = slots[idx].querySelector('.clip-badge')?.outerHTML || '';
@@ -218,6 +219,16 @@ async function regenScene(includeImage) {
           <div class="clip-overlay"><span class="clip-wait-text">대기중</span></div>
           ${badge}
         </div>`;
+      }
+    }
+    // Step 3 이미지 슬롯 (이미지+클립 재생성 시)
+    if (includeImage) {
+      const imgContainer = document.getElementById('image-previews');
+      if (imgContainer) {
+        const imgSlots = imgContainer.querySelectorAll('.scene-thumb');
+        if (imgSlots[idx]) {
+          imgSlots[idx].innerHTML = `<div class="clip-overlay"><span class="clip-wait-text">대기중</span></div><span class="scene-num">${sceneNo}</span>`;
+        }
       }
     }
     toast(`장면 ${sceneNo} 재생성 대기 중 (현재 클립 완료 후 자동 실행)`, 'success');
