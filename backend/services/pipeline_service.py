@@ -1000,6 +1000,24 @@ async def _run_pipeline_steps(
             if missing:
                 print(f"[STEP4] 누락 클립 {len(missing)}개 재생성: "
                       f"{[sc.scene_no for _, sc in missing]}", file=sys.stderr)
+
+                # 누락 클립의 이미지도 없으면 먼저 이미지 재생성 (Step 3 → Step 4)
+                missing_imgs = [(idx, sc) for idx, sc in missing
+                                if not image_path(project_id, sc.scene_no).exists()]
+                if missing_imgs:
+                    print(f"[STEP4] 누락 이미지 {len(missing_imgs)}장 재생성: "
+                          f"{[sc.scene_no for _, sc in missing_imgs]}", file=sys.stderr)
+                    await emitter.update(3, "running",
+                        f"이미지 재생성 중... ({len(missing_imgs)}장)")
+                    from backend.services.gemini_image_service import generate_images as _regen_images
+                    for idx, sc in missing_imgs:
+                        try:
+                            results = await _regen_images(project_id, [sc])
+                            image_files[idx] = results[0]
+                            print(f"[STEP4] 이미지 재생성 완료: 장면 {sc.scene_no}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"[STEP4] 이미지 재생성 실패 (장면 {sc.scene_no}): {e}", file=sys.stderr)
+
                 for idx, scene in missing:
                     _current_clip_idx = idx
                     await _step4_progress_update()
