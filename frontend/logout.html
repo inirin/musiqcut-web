@@ -3,13 +3,18 @@
 <head><meta charset="UTF-8"><title>로그아웃 중...</title></head>
 <body>
 <script>
-// 1) iframe으로 Cloudflare Access 로그아웃 실행 (쿠키 삭제)
-const iframe = document.createElement('iframe');
-iframe.style.display = 'none';
-iframe.src = 'https://musiqcut.cloudflareaccess.com/cdn-cgi/access/logout';
-document.body.appendChild(iframe);
-// 2) 2초 후 랜딩 페이지로 이동
-setTimeout(() => window.location.href = '/landing.html', 3000);
+const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+if (isMobile) {
+  // 모바일: 직접 이동 (iframe 제3자 쿠키 차단 우회)
+  window.location.href = 'https://musiqcut.cloudflareaccess.com/cdn-cgi/access/logout';
+} else {
+  // PC: iframe으로 로그아웃 후 랜딩 이동
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = 'https://musiqcut.cloudflareaccess.com/cdn-cgi/access/logout';
+  document.body.appendChild(iframe);
+  setTimeout(() => window.location.href = '/landing.html', 3000);
+}
 </script>
 <p style="text-align:center;margin-top:40vh;font-family:sans-serif;color:#666">로그아웃 중...</p>
 </body>
