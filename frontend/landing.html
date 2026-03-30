@@ -53,9 +53,21 @@
   .footer a { color: #a78bfa; text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
   @media (max-width: 640px) {
-    .logo { font-size: 2.2rem; }
-    .tagline { font-size: 1.1rem; }
-    .step-arrow { display: none; }
+    .hero { padding: 32px 16px; }
+    .logo { font-size: 2rem; }
+    .tagline { font-size: 1rem; margin-bottom: 32px; }
+    .features { gap: 16px; margin-bottom: 32px; }
+    .feature { padding: 20px 18px; }
+    .feature h3 { font-size: 1rem; }
+    .feature p { font-size: 0.85rem; }
+    .pipeline { padding: 20px 16px; margin-bottom: 32px; }
+    .pipeline h2 { font-size: 1.1rem; }
+    .steps { flex-direction: column; gap: 8px; }
+    .step { min-width: auto; padding: 12px 16px; }
+    .step-arrow { transform: rotate(90deg); justify-content: center; }
+    .platforms { gap: 10px; margin-bottom: 32px; }
+    .platform { padding: 12px 20px; font-size: 0.9rem; }
+    .cta a { padding: 12px 28px; font-size: 1rem; }
   }
 </style>
 </head>
