@@ -128,7 +128,7 @@ async def _generate_random_theme() -> tuple[str, str]:
         try:
             async with aiosqlite.connect(DB_PATH) as db:
                 rows = await db.execute_fetchall(
-                    "SELECT theme, mood FROM projects WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC")
+                    "SELECT theme, mood FROM projects WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC LIMIT 60")
                 existing = [f"{r[0]} | {r[1]}" for r in rows]
         except Exception:
             pass
