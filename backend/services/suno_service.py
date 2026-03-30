@@ -73,8 +73,9 @@ async def _trim_long_intro(file_path: str, max_intro_sec: float = 5.0):
                 vad_parameters=dict(min_silence_duration_ms=300),
                 condition_on_previous_text=cond)
             for seg in segments:
-                # 짧은 보컬라이즈(1초 미만) 무시 — 실제 가사 시작점 찾기
-                if seg.end - seg.start >= 1.0 and len(seg.text.strip()) >= 2:
+                # 보컬라이즈("아..", "오..." 등) 무시 — 실제 가사 시작점 찾기
+                text = seg.text.strip().rstrip('.!?~')
+                if seg.end - seg.start >= 1.0 and len(text) >= 3:
                     first_seg = seg
                     break
             if first_seg is not None:
