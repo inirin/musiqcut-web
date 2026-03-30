@@ -222,7 +222,7 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         from backend.database import DB_PATH
         async with aiosqlite.connect(DB_PATH) as db:
             rows = await db.execute_fetchall(
-                "SELECT title FROM projects ORDER BY created_at DESC LIMIT 15")
+                "SELECT title FROM projects WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC")
             titles = [r[0] for r in rows if r[0]]
             if titles:
                 recent_titles_block = (
