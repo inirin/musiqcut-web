@@ -184,9 +184,10 @@ async def create_and_execute_upload(
 async def auto_upload_if_configured(project_id: str):
     """자동 생성 작품 완료 시 활성화된 플랫폼으로 자동 업로드."""
     print(f"[Upload] 자동 업로드 확인: {project_id[:8]}", file=sys.stderr)
-    import traceback as _tb
+
+    # 활성화된 플랫폼 수집
+    tasks = []
     for platform in ("youtube", "instagram", "tiktok"):
-        print(f"[Upload] 자동 업로드 루프: {platform}", file=sys.stderr)
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             config = await (await db.execute(
@@ -195,17 +196,22 @@ async def auto_upload_if_configured(project_id: str):
             )).fetchone()
             if not config or not config["enabled"]:
                 continue
-
         account = await get_account(platform)
         if account:
+            tasks.append(platform)
+
+    if not tasks:
+        print("[Upload] 활성화된 자동 업로드 플랫폼 없음", file=sys.stderr)
+        return
+
+    # 동시 업로드
+    async def _upload(platform):
+        try:
             print(f"[Upload] {platform} 자동 업로드 실행", file=sys.stderr)
-            try:
-                result = await create_and_execute_upload(project_id, platform)
-                print(f"[Upload] {platform} 자동 업로드 결과: {result.get('ok')} {result.get('url', result.get('error', ''))}", file=sys.stderr)
-            except Exception as e:
-                print(f"[Upload] {platform} 자동 업로드 에러: {e}", file=sys.stderr)
-                _tb.print_exc(file=sys.stderr)
-            # 플랫폼 간 rate limit 방지
-            print(f"[Upload] {platform} 완료, 10초 대기...", file=sys.stderr)
-            await asyncio.sleep(10)
-            print(f"[Upload] {platform} 대기 완료", file=sys.stderr)
+            result = await create_and_execute_upload(project_id, platform)
+            print(f"[Upload] {platform} 자동 업로드 결과: {result.get('ok')} {result.get('url', result.get('error', ''))}", file=sys.stderr)
+        except Exception as e:
+            print(f"[Upload] {platform} 자동 업로드 에러: {e}", file=sys.stderr)
+
+    print(f"[Upload] {len(tasks)}개 플랫폼 동시 업로드: {tasks}", file=sys.stderr)
+    await asyncio.gather(*[_upload(p) for p in tasks])
