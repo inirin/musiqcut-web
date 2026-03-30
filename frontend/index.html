@@ -505,7 +505,7 @@
 
       <!-- ── 로그아웃 ── -->
       <div style="margin-top:32px;text-align:center">
-        <a href="https://musiqcut.cloudflareaccess.com/cdn-cgi/access/logout" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:var(--text-sm);opacity:0.6;transition:opacity 0.2s;text-decoration:none" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.6'">로그아웃</a>
+        <a href="#" onclick="fetch('https://musiqcut.cloudflareaccess.com/cdn-cgi/access/logout',{mode:'no-cors'}).finally(()=>window.location.href='/landing.html');return false;" style="background:none;border:none;cursor:pointer;color:var(--error);font-size:var(--text-sm);opacity:0.6;transition:opacity 0.2s;text-decoration:none" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.6'">로그아웃</a>
       </div>
 
     </div>
