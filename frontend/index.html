@@ -7,7 +7,15 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>MusiqCut</title>
-  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto')</script>
+  <script>
+    // 비로그인 사용자 → 랜딩 페이지로 리다이렉트
+    fetch('/api/pipeline/status', {method: 'GET'}).then(r => {
+      if (r.status === 401 || r.status === 403 || r.redirected) {
+        window.location.href = '/landing.html';
+      }
+    }).catch(() => {});
+    document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'auto');
+  </script>
   <link rel="stylesheet" href="/css/style.css?v=1774612013">
 </head>
 <body>
