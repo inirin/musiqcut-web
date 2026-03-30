@@ -56,6 +56,7 @@ STORY_PROMPT = """당신은 뮤지컬 애니메이션 콘텐츠 작가입니다.
 
 장르와 톤:
 - 테마에 어울리는 장르를 자유롭게 선택하거나 창조하세요 — 기존 장르에 얽매이지 말고, 의외의 조합이나 하이브리드도 환영
+- 장르 힌트 (참고만, 이 외에도 자유롭게): {genre_hints}
 
 아트 스타일:
 - 테마, 장르, 분위기에 가장 어울리는 **애니메이션 아트 스타일**을 자유롭게 선택하세요
@@ -231,6 +232,31 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
     except Exception:
         pass
 
+    # 장르 힌트 랜덤 샘플링 (매번 다른 조합)
+    import random
+    _ALL_GENRES = [
+        "jazz", "swing", "big band", "bebop",
+        "opera", "operetta", "classical crossover",
+        "rock musical", "punk rock", "garage rock",
+        "hip-hop", "rap", "trap", "boom bap",
+        "folk", "acoustic folk", "country", "bluegrass",
+        "reggae", "ska", "dancehall",
+        "bossa nova", "samba", "tango", "latin pop",
+        "gospel", "soul", "R&B", "motown",
+        "electronic", "synthpop", "synthwave", "lo-fi",
+        "EDM", "house", "techno", "drum and bass",
+        "orchestral pop", "cinematic", "epic orchestral",
+        "K-pop", "city pop", "J-pop",
+        "trot", "gugak fusion", "enka",
+        "disco", "funk", "afrobeat",
+        "indie", "dream pop", "shoegaze",
+        "metal", "power metal", "symphonic metal",
+        "blues", "delta blues", "Chicago blues",
+        "musical theater", "cabaret", "vaudeville",
+        "ambient", "new age", "chillwave",
+    ]
+    genre_hints = ", ".join(random.sample(_ALL_GENRES, min(8, len(_ALL_GENRES))))
+
     prompt = STORY_PROMPT.format(
         theme=theme, mood=mood,
         duration_desc=guide["duration"],
@@ -238,6 +264,7 @@ async def generate_story(theme: str, mood: str, length: str = "short") -> dict:
         structure_desc=guide["structure"],
         suno_hint=guide["suno_hint"],
         recent_titles_block=recent_titles_block,
+        genre_hints=genre_hints,
     )
     # 트렌드 힌트가 있으면 Google Search grounding으로 실존 인물/작품 검색
     if "[트렌드 힌트:" in mood:
