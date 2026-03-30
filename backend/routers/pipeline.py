@@ -14,6 +14,29 @@ from backend.services.pipeline_service import run_pipeline
 router = APIRouter()
 
 
+async def _notify_slot_pending_db_only(project_id: str, step_no: int, scene_no: int):
+    """DB 슬롯만 pending으로 업데이트 (emitter 없을 때)."""
+    try:
+        slot_key = "clip_slots" if step_no == 4 else "images"
+        async with aiosqlite.connect(DB_PATH) as db:
+            row = await (await db.execute(
+                "SELECT output_data FROM pipeline_steps WHERE project_id=? AND step_no=? ORDER BY id DESC LIMIT 1",
+                (project_id, step_no))).fetchone()
+            if row and row[0]:
+                data = json.loads(row[0])
+                slots = data.get(slot_key, [])
+                idx = scene_no - 1
+                if 0 <= idx < len(slots):
+                    slots[idx]["status"] = "pending"
+                    slots[idx].pop("url", None)
+                    await db.execute(
+                        "UPDATE pipeline_steps SET output_data=? WHERE project_id=? AND step_no=? AND id=(SELECT MAX(id) FROM pipeline_steps WHERE project_id=? AND step_no=?)",
+                        (json.dumps(data, ensure_ascii=False), project_id, step_no, project_id, step_no))
+                    await db.commit()
+    except Exception as e:
+        print(f"[Regen] DB 슬롯 업데이트 실패: {e}", file=__import__('sys').stderr)
+
+
 async def _notify_slot_pending(project_id: str, emitter: ProgressEmitter,
                                step_no: int, scene_no: int):
     """재생성 시 DB 슬롯을 pending으로 업데이트 + WebSocket 알림."""
@@ -112,14 +135,22 @@ async def regenerate_scene_endpoint(project_id: str, scene_no: int, include_imag
     # (루프가 해당 장면에 도달하면 파일 없으니 자동 재생성)
     existing_emitter = get_emitter(project_id)
     if _pipeline_lock.locked() and existing_emitter and not existing_emitter.done:
-        # 재생성 대상 스텝의 DB 슬롯 + WebSocket 알림
-        regen_steps = [4]
+        # DB 슬롯 pending + WebSocket 알림
+        await _notify_slot_pending(project_id, existing_emitter, 4, scene_no)
         if include_image:
-            regen_steps = [3, 4]
-        for step_no in regen_steps:
-            await _notify_slot_pending(project_id, existing_emitter, step_no, scene_no)
+            await _notify_slot_pending(project_id, existing_emitter, 3, scene_no)
 
         print(f"[Regen] 파이프라인 실행 중 — 파일만 삭제, 루프에서 자동 재생성 예정",
+              file=__import__('sys').stderr)
+        return {"ok": True, "project_id": project_id, "scene_no": scene_no,
+                "from_step": from_step, "deleted": deleted,
+                "queued": True}
+
+    # 파이프라인이 이 프로젝트에서 실행 중이지만 emitter가 없는 경우 (다른 프로젝트 실행 중)
+    if _pipeline_lock.locked():
+        # DB 슬롯만 업데이트 (WebSocket 없이)
+        await _notify_slot_pending_db_only(project_id, 4, scene_no)
+        print(f"[Regen] 다른 작품 파이프라인 실행 중 — 파일만 삭제, 대기",
               file=__import__('sys').stderr)
         return {"ok": True, "project_id": project_id, "scene_no": scene_no,
                 "from_step": from_step, "deleted": deleted,
