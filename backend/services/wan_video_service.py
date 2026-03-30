@@ -315,31 +315,30 @@ async def generate_video_clips(
                            and 'no people' not in img_prompt.lower()
                            and 'no characters' not in img_prompt.lower())
         if shot_type == 'wide' and not wide_has_people:
-            # 와이드샷 (인물 없음): 환경 모션만
+            # 와이드샷 (인물 없음): 환경 모션만, 카메라 워크 중심
             main_prompt = (
-                f'Cinematic landscape scene, gentle camera movement, '
-                f'absolutely no people, no humans, no characters, no figures, empty scene, '
-                f'all motion must obey real-world physics, '
-                f'only things that naturally move in reality should move '
-                f'(e.g. water flows, clouds drift, leaves fall, fire flickers, wind blows), '
-                f'rigid objects stay still, '
+                f'Cinematic landscape shot, slow smooth camera pan, '
+                f'completely empty scene, no living beings, uninhabited, '
+                f'environmental motion only: wind rustling leaves, clouds drifting, water flowing, light shifting, '
+                f'all objects obey real-world physics, rigid objects stay perfectly still, '
                 f'{img_prompt}'
             )
         elif shot_type == 'wide' and wide_has_people:
-            # 와이드샷 (등장인물 있음): 전신 캐릭터 모션 + 환경
+            # 와이드샷 (등장인물 있음): 기존 인물만 움직임
             main_prompt = (
-                f'Cinematic wide shot, gentle full body movement, walking or standing, '
-                f'mouth closed, no talking, '
-                f'natural environment motion, wind, atmospheric, '
+                f'Cinematic wide shot, only existing characters move gently, '
+                f'no new people appearing, no crowd forming, '
+                f'subtle full body movement, walking or standing, mouth closed, no talking, '
+                f'natural environment motion, wind blowing hair and clothes, atmospheric lighting, '
                 f'{img_prompt}'
             )
         else:
             # 클로즈업/미디엄: 캐릭터 모션 (립싱크 아닌 클립 — 입 닫힌 채)
             main_prompt = (
-                f'Animated character with mouth firmly closed the entire time, '
-                f'lips sealed shut, never opens mouth, '
-                f'natural body sway, expressive eyes, gentle head movement, '
-                f'cinematic lighting, {img_prompt}'
+                f'Animated character, mouth firmly closed the entire time, lips sealed shut, '
+                f'subtle natural motion: gentle breathing, slight body sway, blinking eyes, '
+                f'hair and clothes move with wind, expressive eyes, gentle head tilt, '
+                f'cinematic lighting, high quality animation, {img_prompt}'
             )
         prompts_to_try = [main_prompt]
         prompts_to_try.extend(FALLBACK_PROMPTS)
@@ -358,19 +357,18 @@ async def generate_video_clips(
                 scene_dur = getattr(scene, 'duration', 0) or CLIP_DURATION
                 frames = _calc_frames(scene_dur)
                 if shot_type == 'wide' and not wide_has_people:
-                    neg = ("blurry, distorted, low quality, watermark, "
-                           "person, people, human, man, woman, boy, girl, face, figure, character, "
-                           "person appearing, human emerging, someone walking in, "
+                    neg = ("blurry, distorted, low quality, watermark, morphing, deformation, "
+                           "person, people, human, man, woman, boy, girl, face, figure, character, silhouette, "
+                           "person appearing, human emerging, someone walking in, crowd, "
                            "physically impossible motion, defying gravity, "
-                           "inanimate objects moving on their own "
-                           "(e.g. clothes standing up, furniture sliding, rocks floating)")
+                           "inanimate objects moving on their own")
                 elif shot_type == 'wide' and wide_has_people:
-                    neg = ("blurry, distorted, low quality, watermark, "
+                    neg = ("blurry, distorted, low quality, watermark, morphing, deformation, "
                            "extra people appearing, new character emerging, crowd forming, "
                            "talking, singing, lip sync, mouth opening, "
                            "physically impossible motion, defying gravity")
                 else:
-                    neg = ("blurry, distorted, low quality, watermark, "
+                    neg = ("blurry, distorted, low quality, watermark, morphing, deformation, "
                            "talking, singing, lip sync, mouth opening and closing as if speaking")
                 wf = _build_native_workflow(
                     img_name, attempt_prompt, seed, prefix, frames,
